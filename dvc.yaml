@@ -1,0 +1,13 @@
+stages:
+  prepare:
+    cmd: uv run python -m arabic_sentiment_mlops.data.prepare --raw data/raw/alldata.csv --out data/processed
+    deps:
+      - data/raw/alldata.csv
+      - src/arabic_sentiment_mlops/data/prepare.py
+    outs:
+      - data/processed/train.parquet
+      - data/processed/val.parquet
+      - data/processed/test.parquet
+    metrics:
+      - data/processed/data_card.json:
+          cache: false
