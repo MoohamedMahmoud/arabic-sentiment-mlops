@@ -1,0 +1,11 @@
+{
+  "selected_run": "trial_03_epochs_3",
+  "selection_metric": "validation_f1_macro",
+  "validation_f1_macro": 0.8698572180064552,
+  "configuration": {
+    "name": "epochs_3",
+    "learning_rate": 2e-05,
+    "num_train_epochs": 3,
+    "max_length": 160
+  }
+}

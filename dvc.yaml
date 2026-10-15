@@ -1,13 +1,30 @@
 stages:
   prepare:
-    cmd: uv run python -m arabic_sentiment_mlops.data.prepare --raw data/raw/alldata.csv --out data/processed
+    cmd: uv run python -m arabic_sentiment_mlops.prepare --input data/raw/alldata.csv --output data/processed --seed 42
     deps:
       - data/raw/alldata.csv
-      - src/arabic_sentiment_mlops/data/prepare.py
+      - src/arabic_sentiment_mlops/prepare.py
+      - src/arabic_sentiment_mlops/data.py
     outs:
       - data/processed/train.parquet
       - data/processed/val.parquet
       - data/processed/test.parquet
     metrics:
       - data/processed/data_card.json:
+          cache: false
+
+  train:
+    cmd: uv run python -m arabic_sentiment_mlops.train --run-name arabert_v02_dvc_train
+    deps:
+      - data/processed/train.parquet
+      - data/processed/val.parquet
+      - data/processed/test.parquet
+      - src/arabic_sentiment_mlops/config.py
+      - src/arabic_sentiment_mlops/data.py
+      - src/arabic_sentiment_mlops/preprocessing.py
+      - src/arabic_sentiment_mlops/evaluate.py
+      - src/arabic_sentiment_mlops/mlflow_utils.py
+      - src/arabic_sentiment_mlops/train.py
+    metrics:
+      - reports/mlflow/arabert_v02_dvc_train/train_metrics.json:
           cache: false

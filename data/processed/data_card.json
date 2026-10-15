@@ -1,0 +1,45 @@
+{
+  "raw_file": "data/raw/alldata.csv",
+  "raw_file_sha256": "1f3eaff8806867fe322670f6227dae7a0c74286fe27c38088ad01faa93537e54",
+  "seed": 42,
+  "labels": [
+    "NEGATIVE",
+    "NEUTRAL",
+    "POSITIVE"
+  ],
+  "cleaning": {
+    "rows_in": 110760,
+    "dropped_missing_label": 1,
+    "dropped_unknown_label": 0,
+    "conflicting_canonical_groups": 19,
+    "dropped_conflicting_rows": 108,
+    "dropped_duplicate_rows": 21913,
+    "rows_after_cleaning": 88738
+  },
+  "splits": {
+    "train": {
+      "rows": 70990,
+      "label_counts": {
+        "NEGATIVE": 33107,
+        "NEUTRAL": 20215,
+        "POSITIVE": 17668
+      }
+    },
+    "validation": {
+      "rows": 8874,
+      "label_counts": {
+        "NEGATIVE": 4139,
+        "NEUTRAL": 2527,
+        "POSITIVE": 2208
+      }
+    },
+    "test": {
+      "rows": 8874,
+      "label_counts": {
+        "NEGATIVE": 4139,
+        "NEUTRAL": 2527,
+        "POSITIVE": 2208
+      }
+    }
+  }
+}

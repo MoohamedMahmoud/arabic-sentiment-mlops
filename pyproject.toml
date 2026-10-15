@@ -1,0 +1,49 @@
+[project]
+name = "arabic-sentiment-mlops"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Mohamed MMES", email = "mohamedmahmoud2022.333@gmail.com" }
+]
+requires-python = "==3.12.*"
+dependencies = [
+    "accelerate>=1.15.0",
+    "arabert>=1.0.1",
+    "datasets>=5.0.1",
+    "evaluate>=0.4.6",
+    "matplotlib>=3.11.2",
+    "mlflow>=3.16.1",
+    "numpy>=2.5.3",
+    "pandas>=3.0.6",
+    "pyarrow>=25.0.1",
+    "scikit-learn>=1.9.1",
+    "torch>=2.14.1",
+    "transformers>=5.18.0",
+]
+
+[project.scripts]
+arabic-sentiment-mlops = "arabic_sentiment_mlops:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "dvc>=3.67.1",
+    "httpx>=0.28.1",
+    "ipykernel>=7.3.0",
+    "nbconvert>=7.17.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.10",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu132" }
+
+[[tool.uv.index]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
+explicit = true

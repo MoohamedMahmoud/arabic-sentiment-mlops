@@ -1,31 +1,35 @@
 schema: '2.0'
 stages:
   prepare:
-    cmd: uv run python -m arabic_sentiment_mlops.data.prepare --raw 
-      data/raw/alldata.csv --out data/processed
+    cmd: uv run python -m arabic_sentiment_mlops.prepare --input
+      data/raw/alldata.csv --output data/processed --seed 42
     deps:
     - path: data/raw/alldata.csv
       hash: md5
       md5: deae3325b42e4f9b7c1230101188f5cd
       size: 27634114
-    - path: src/arabic_sentiment_mlops/data/prepare.py
+    - path: src/arabic_sentiment_mlops/data.py
       hash: md5
-      md5: 4b56bcd945d3c9006bccf9701d95d4f1
-      size: 15819
+      md5: baabe25a6240b9a991fd779a6cd6df09
+      size: 2203
+    - path: src/arabic_sentiment_mlops/prepare.py
+      hash: md5
+      md5: 4709c3929416baa65a67211fa9ccafae
+      size: 7079
     outs:
     - path: data/processed/data_card.json
       hash: md5
-      md5: d7804ad5626bdd1d7d37970cfafc4eee
-      size: 1564
+      md5: ceef7898163a7fc2f85a7823cee5d151
+      size: 983
     - path: data/processed/test.parquet
       hash: md5
-      md5: eb6f538ccf51a477218d03a4b0f18e6d
-      size: 1309329
+      md5: 2cc0743373dfcbf86f2e8350e3e9d30f
+      size: 1319407
     - path: data/processed/train.parquet
       hash: md5
-      md5: f725d797b67e7486e98735595eb95f97
-      size: 10564159
+      md5: 0d2691e8a0165d32e0a71a702691b93a
+      size: 10613699
     - path: data/processed/val.parquet
       hash: md5
-      md5: 2dc19d5d42ba88acba5d2dc95f8e342d
-      size: 1325204
+      md5: d62d9abbc56a7216225966ebf64afe2a
+      size: 1370140

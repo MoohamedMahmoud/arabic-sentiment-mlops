@@ -1,0 +1,116 @@
+name: arabic-sentiment-mlops-infra
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mlflow
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow -d mlflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [mlops-internal]
+
+  object-store:
+    # RustFS provides an S3-compatible API. It replaces the removed minio/minio Docker Hub image.
+    # This version is also used by the current MLflow upstream example Compose stack.
+    image: rustfs/rustfs:1.0.0-alpha.83
+    restart: unless-stopped
+    command: ["/data"]
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in the root .env file}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in the root .env file}
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_SERVER_DOMAINS: "object-store:9000"
+      RUSTFS_REGION: us-east-1
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - object_store_data:/data
+    networks: [mlops-internal]
+
+
+  create-mlflow-bucket:
+    image: amazon/aws-cli:2.33.25
+    restart: "no"
+    depends_on:
+      - object-store
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        until aws --endpoint-url "$${MLFLOW_S3_ENDPOINT_URL}" s3api list-buckets >/dev/null 2>&1; do
+          sleep 2
+        done
+        if ! aws --endpoint-url "$${MLFLOW_S3_ENDPOINT_URL}" s3api head-bucket --bucket "$${MLFLOW_BUCKET}" >/dev/null 2>&1; then
+          aws --endpoint-url "$${MLFLOW_S3_ENDPOINT_URL}" s3api create-bucket --bucket "$${MLFLOW_BUCKET}"
+        fi
+        echo "Bucket $${MLFLOW_BUCKET} is ready."
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in the root .env file}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in the root .env file}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_S3_ADDRESSING_STYLE: path
+      MLFLOW_S3_ENDPOINT_URL: http://object-store:9000
+      MLFLOW_BUCKET: ${MLFLOW_BUCKET:-mlflow-artifacts}
+    networks: [mlops-internal]
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/mlflow.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      create-mlflow-bucket:
+        condition: service_completed_successfully
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://object-store:9000
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in the root .env file}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in the root .env file}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_S3_ADDRESSING_STYLE: path
+      MLFLOW_S3_IGNORE_TLS: "true"
+    command:
+      - mlflow
+      - server
+      - --backend-store-uri
+      - postgresql+psycopg2://mlflow:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}@postgres:5432/mlflow
+      - --artifacts-destination
+      - s3://${MLFLOW_BUCKET:-mlflow-artifacts}
+      - --serve-artifacts
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+    ports:
+      - "127.0.0.1:5000:5000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks: [mlops-internal]
+
+networks:
+  mlops-internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  object_store_data:

@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local model weights and training checkpoints (keep out of Git)
+models/
+*.safetensors
+
+# Local MLflow database; the Docker stack uses PostgreSQL
+mlflow.db
+
+# Extra raw split files; the current DVC pipeline uses alldata.csv
+data/raw/train.csv
+data/raw/dev.csv
+data/raw/test.csv
+
+# Generated notebook HTML exports
+notebooks/*.html
