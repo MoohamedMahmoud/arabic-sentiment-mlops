@@ -1,0 +1,4 @@
+FROM ghcr.io/mlflow/mlflow:v3.16.1
+
+# PostgreSQL tracking backend and S3-compatible artifact storage support.
+RUN pip install --no-cache-dir "psycopg2-binary>=2.9,<3" "boto3>=1.35,<2"

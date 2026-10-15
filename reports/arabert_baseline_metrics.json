@@ -1,0 +1,20 @@
+{
+  "model_name": "aubmindlab/bert-base-arabertv02",
+  "seed": 42,
+  "max_length": 160,
+  "tokenizer_model_max_length": 512,
+  "train_rows": 70989,
+  "validation_rows": 8874,
+  "test_rows": 8874,
+  "p95_token_length": 132,
+  "estimated_truncation_rate": 0.03882258809741145,
+  "best_checkpoint": "e:\\03 Education\\Online Courses\\MLOps MENA\\Final Project\\arabic-sentiment-mlops\\models\\arabert_baseline\\checkpoints\\checkpoint-8874",
+  "test_metrics": {
+    "eval_loss": 0.3486078083515167,
+    "eval_accuracy": 0.8729997746224927,
+    "eval_f1_macro": 0.8663208566171967
+  },
+  "torch_version": "2.14.1+cu132",
+  "torch_cuda": "13.2",
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU"
+}

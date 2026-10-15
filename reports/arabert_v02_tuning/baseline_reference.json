@@ -1,0 +1,14 @@
+{
+  "run": "baseline_existing",
+  "learning_rate": 2e-05,
+  "num_train_epochs": 2,
+  "max_length": 160,
+  "weight_decay": 0.01,
+  "warmup_steps": 0.1,
+  "val_accuracy": 0.873112,
+  "val_f1_macro": 0.866439,
+  "val_loss": 0.344909,
+  "test_accuracy": 0.873,
+  "test_f1_macro": 0.8663,
+  "model_path": "e:\\03 Education\\Online Courses\\MLOps MENA\\Final Project\\arabic-sentiment-mlops\\models\\arabert_baseline"
+}
