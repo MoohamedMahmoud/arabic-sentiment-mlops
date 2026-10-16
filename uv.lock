@@ -199,6 +199,7 @@ dependencies = [
     { name = "arabert" },
     { name = "datasets" },
     { name = "evaluate" },
+    { name = "fastapi" },
     { name = "matplotlib" },
     { name = "mlflow" },
     { name = "numpy" },
@@ -207,6 +208,7 @@ dependencies = [
     { name = "scikit-learn" },
     { name = "torch" },
     { name = "transformers" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -226,6 +228,7 @@ requires-dist = [
     { name = "arabert", specifier = ">=1.0.1" },
     { name = "datasets", specifier = ">=5.0.1" },
     { name = "evaluate", specifier = ">=0.4.6" },
+    { name = "fastapi", specifier = ">=0.142.2" },
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "mlflow", specifier = ">=3.16.1" },
     { name = "numpy", specifier = ">=2.5.3" },
@@ -234,6 +237,7 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.9.1" },
     { name = "torch", specifier = ">=2.14.1", index = "https://download.pytorch.org/whl/cu132" },
     { name = "transformers", specifier = ">=5.18.0" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
 [package.metadata.requires-dev]

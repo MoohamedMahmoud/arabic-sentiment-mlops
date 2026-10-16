@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     learning_rate: float = 2e-5
     num_train_epochs: int = 3
     weight_decay: float = 0.01
-    warmup_steps: float = 0.1
+    warmup_ratio: float = 0.1
     fp16: bool = True
     gradient_checkpointing: bool = True
     seed: int = 42

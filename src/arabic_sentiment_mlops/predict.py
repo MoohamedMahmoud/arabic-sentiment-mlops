@@ -1,4 +1,4 @@
-"""Production prediction through the MLflow Model Registry."""
+﻿"""Production prediction through the MLflow Model Registry."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from typing import Any
 
 import mlflow
 import pandas as pd
+from .config import settings
 
 from .mlflow_utils import get_model_version_by_alias
 
@@ -17,6 +18,9 @@ class ProductionPredictor:
         self.model_uri = model_uri
         self.model_name = model_name
         self.alias = alias
+        # Use the configured Docker-based MLflow tracking server.
+        mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+
         self.model_version = get_model_version_by_alias(model_name, alias)
         self.model = mlflow.pyfunc.load_model(model_uri)
 

@@ -10,12 +10,12 @@ stages:
       size: 27634114
     - path: src/arabic_sentiment_mlops/data.py
       hash: md5
-      md5: baabe25a6240b9a991fd779a6cd6df09
-      size: 2203
+      md5: 601757a7e442d1b042f2acb9aec84e6d
+      size: 2279
     - path: src/arabic_sentiment_mlops/prepare.py
       hash: md5
-      md5: 4709c3929416baa65a67211fa9ccafae
-      size: 7079
+      md5: a07d807ceb747abed1d1183c323db7bd
+      size: 7317
     outs:
     - path: data/processed/data_card.json
       hash: md5
@@ -33,3 +33,67 @@ stages:
       hash: md5
       md5: d62d9abbc56a7216225966ebf64afe2a
       size: 1370140
+  train:
+    cmd: uv run python -m arabic_sentiment_mlops.tune
+    deps:
+    - path: data/processed/test.parquet
+      hash: md5
+      md5: 2cc0743373dfcbf86f2e8350e3e9d30f
+      size: 1319407
+    - path: data/processed/train.parquet
+      hash: md5
+      md5: 0d2691e8a0165d32e0a71a702691b93a
+      size: 10613699
+    - path: data/processed/val.parquet
+      hash: md5
+      md5: d62d9abbc56a7216225966ebf64afe2a
+      size: 1370140
+    - path: src/arabic_sentiment_mlops/config.py
+      hash: md5
+      md5: f13f83bab43581b06459df4973ffcb2b
+      size: 1828
+    - path: src/arabic_sentiment_mlops/data.py
+      hash: md5
+      md5: 601757a7e442d1b042f2acb9aec84e6d
+      size: 2279
+    - path: src/arabic_sentiment_mlops/evaluate.py
+      hash: md5
+      md5: 24a8af46122c38e7a706d3a1a7e73b72
+      size: 1513
+    - path: src/arabic_sentiment_mlops/mlflow_utils.py
+      hash: md5
+      md5: 934d77c9f3b530e8328957ee47935781
+      size: 2553
+    - path: src/arabic_sentiment_mlops/preprocessing.py
+      hash: md5
+      md5: 763eddeae0bcdbcb5c0442415d7a686a
+      size: 2390
+    - path: src/arabic_sentiment_mlops/train.py
+      hash: md5
+      md5: b5cc40f9e49c5dd6f751d284825eecf6
+      size: 10585
+    - path: src/arabic_sentiment_mlops/tune.py
+      hash: md5
+      md5: d9734460c99d6b18a2c090cad228f985
+      size: 10849
+    outs:
+    - path: reports/mlflow/epochs_3/train_metrics.json
+      hash: md5
+      md5: 1ab4b5a27068d1dc9b542f599b5a466a
+      size: 284
+    - path: reports/mlflow/lr_1e-5/train_metrics.json
+      hash: md5
+      md5: 3c7d789041207e33caa5feda974c8960
+      size: 283
+    - path: reports/mlflow/lr_3e-5/train_metrics.json
+      hash: md5
+      md5: 77e6f18c45808e7d69907d72a066670b
+      size: 286
+    - path: reports/mlflow/max_length_256/train_metrics.json
+      hash: md5
+      md5: b8c0afeca47a3166ffcd0a184961aaba
+      size: 285
+    - path: reports/mlflow/tuning_sweep_summary.json
+      hash: md5
+      md5: b742005714684b2910086ee720d3951b
+      size: 978
