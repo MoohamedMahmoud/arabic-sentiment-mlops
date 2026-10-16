@@ -231,3 +231,5 @@ data/raw/test.csv
 
 # Generated notebook HTML exports
 notebooks/*.html
+
+reports/mlflow/tuning_sweep_state.json

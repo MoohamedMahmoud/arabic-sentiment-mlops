@@ -1,4 +1,4 @@
-"""Train one AraBERTv0.2 configuration and track it with MLflow."""
+﻿"""Train one AraBERTv0.2 configuration and track it with MLflow."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ class TrainingConfig:
     eval_batch_size: int = settings.eval_batch_size
     gradient_accumulation_steps: int = settings.gradient_accumulation_steps
     weight_decay: float = settings.weight_decay
-    warmup_steps: float = settings.warmup_steps
+    warmup_ratio: float = settings.warmup_ratio
     fp16: bool = settings.fp16
     gradient_checkpointing: bool = settings.gradient_checkpointing
     seed: int = settings.seed
@@ -199,7 +199,7 @@ def train_one(
         num_train_epochs=config.num_train_epochs,
         learning_rate=config.learning_rate,
         weight_decay=config.weight_decay,
-        warmup_steps=config.warmup_steps,
+        warmup_steps=config.warmup_ratio,
         fp16=config.fp16,
         gradient_checkpointing=config.gradient_checkpointing,
         load_best_model_at_end=True,
