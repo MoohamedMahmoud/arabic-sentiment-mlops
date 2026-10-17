@@ -1,0 +1,27 @@
+﻿service: "serving.service:ArabicSentimentService"
+
+description: "Arabic sentiment inference service using MLflow model version 2."
+
+labels:
+  project: "arabic-sentiment-mlops"
+  registered_model: "ArabicSentiment"
+  mlflow_model_version: "2"
+
+models:
+  - "arabic_sentiment_v2:ui5zcfgkc2qxoaav"
+
+include:
+  - "serving/service.py"
+  - "wheels/*.whl"
+
+python:
+  packages:
+    - "mlflow"
+    - "numpy"
+    - "pandas"
+    - "torch"
+    - "transformers"
+    - "arabert"
+    - "pydantic-settings"
+    - "./wheels/arabic_sentiment_mlops-0.1.0-py3-none-any.whl"
+    

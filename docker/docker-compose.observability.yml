@@ -1,0 +1,76 @@
+name: arabic-sentiment-demo
+services:
+  inference-proxy:
+    build:
+      context: ../monitoring
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      BENTO_BASE_URL: ${BENTO_BASE_URL:-http://host.docker.internal:3001}
+      EVENTS_DB: /data/predictions.sqlite3
+      REFERENCE_DISTRIBUTION_PATH: /app/reference_distribution.json
+      MAX_BATCH_SIZE: "8"
+      DRIFT_WINDOW_PREDICTIONS: "500"
+    volumes:
+      - prediction_data:/data
+      - ../monitoring/reference_distribution.json:/app/reference_distribution.json:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ../ui
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SENTIMENT_API_URL: http://inference-proxy:8000/predict
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      inference-proxy:
+        condition: service_started
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      inference-proxy:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-local-change-me}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3002:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  prediction_data:
+  prometheus_data:
+  grafana_data:

@@ -1,4 +1,4 @@
-﻿"""Production prediction through the MLflow Model Registry."""
+"""Production prediction through the MLflow Model Registry."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ from typing import Any
 
 import mlflow
 import pandas as pd
-from .config import settings
 
+from .config import settings
 from .mlflow_utils import get_model_version_by_alias
 
 
@@ -45,6 +45,9 @@ class ProductionPredictor:
     def predict_batch(self, texts: list[str]) -> list[dict[str, Any]]:
         """Return predictions for multiple reviews."""
 
+        if not texts:
+            return []
+
         frame = pd.DataFrame({"text": texts})
         predictions = self.model.predict(frame)
 
@@ -54,5 +57,5 @@ class ProductionPredictor:
                 "confidence": float(row["confidence"]),
                 "model_version": str(self.model_version.version),
             }
-            for _, row in predictions.iterrows()
+            for row in predictions.to_dict(orient="records")
         ]
