@@ -1,0 +1,35 @@
+groups:
+  - name: arabic-sentiment-serving
+    rules:
+      - alert: SentimentApiHighP95Latency
+        expr: histogram_quantile(0.95, sum by (le) (rate(sentiment_http_request_duration_seconds_bucket{endpoint="/predict"}[5m]))) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Arabic sentiment API p95 latency is above 2 seconds
+          description: Inspect BentoML logs, the proxy metrics, and host CPU/RAM/GPU utilization before increasing concurrency.
+      - alert: SentimentApiHigh5xxRate
+        expr: (sum(rate(sentiment_http_requests_total{endpoint="/predict",status_code=~"5.."}[5m])) / clamp_min(sum(rate(sentiment_http_requests_total{endpoint="/predict"}[5m])), 0.001)) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than 5 percent of sentiment prediction requests are failing
+          description: Check whether BentoML is healthy and whether requests exceed the gateway batch limit of 8.
+      - alert: SentimentPredictionDistributionDrift
+        expr: sentiment_drift_reference_available == 1 and sentiment_prediction_distribution_psi > 0.25 and sum(rate(sentiment_http_requests_total{endpoint="/predict"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Predicted sentiment distribution PSI exceeded 0.25
+          description: Inspect a labeled sample and input changes. PSI is a warning signal, not proof of accuracy degradation.
+      - alert: SentimentInputLengthDrift
+        expr: sentiment_drift_reference_available == 1 and sentiment_text_length_psi > 0.25 and sum(rate(sentiment_http_requests_total{endpoint="/predict"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Incoming review length PSI exceeded 0.25
+          description: Review whether users' incoming text length distribution changed compared with the evaluated reference set.

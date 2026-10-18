@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install project and development dependencies
+        run: uv sync --locked --group dev
+
+      - name: Lint project code
+        run: uv run ruff check src tests scripts monitoring loadtest ui
+
+      - name: Check formatting
+        run: uv run ruff format --check scripts monitoring loadtest ui
+
+      - name: Run test suite
+        run: uv run pytest -q
+
+      - name: Apply serving quality gate when a complete evaluation report is committed
+        shell: bash
+        run: |
+          if [[ -f reports/serving/api_evaluation.json ]]; then
+            uv run python scripts/quality_gate.py reports/serving/api_evaluation.json
+          else
+            echo "No complete serving evaluation committed yet; runtime quality gate skipped."
+          fi

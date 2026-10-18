@@ -66,6 +66,48 @@ class ArabicSentimentModel:
         }
 
     def predict_batch(self, texts: list[str]) -> list[dict[str, Any]]:
-        """Return predictions for multiple reviews."""
+        """Predict multiple reviews in a single model forward pass."""
 
-        return [self.predict_one(text) for text in texts]
+        if not texts:
+            return []
+
+        cleaned_texts = [self.preprocessor.clean_text(text) for text in texts]
+
+        encoded = self.preprocessor.tokenizer(
+            cleaned_texts,
+            truncation=True,
+            max_length=self.preprocessor.max_length,
+            padding=True,
+            return_tensors="pt",
+        )
+
+        batch = {
+            key: value.to(self.device)
+            for key, value in encoded.items()
+            if key
+            in {
+                "input_ids",
+                "token_type_ids",
+                "attention_mask",
+            }
+        }
+
+        with torch.inference_mode():
+            outputs = self.model(**batch)
+            probabilities = torch.softmax(outputs.logits, dim=-1)
+            confidence_scores, predicted_ids = probabilities.max(dim=-1)
+
+        predicted_ids = predicted_ids.cpu().tolist()
+        confidence_scores = confidence_scores.cpu().tolist()
+
+        return [
+            {
+                "label": ID2LABEL[int(label_id)],
+                "confidence": float(confidence),
+            }
+            for label_id, confidence in zip(
+                predicted_ids,
+                confidence_scores,
+                strict=True,
+            )
+        ]

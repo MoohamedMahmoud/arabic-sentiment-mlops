@@ -232,4 +232,7 @@ data/raw/test.csv
 # Generated notebook HTML exports
 notebooks/*.html
 
+# Generated or temporary experiment artifacts
 reports/mlflow/tuning_sweep_state.json
+/reports/locust/
+/reports/serving/api_test_predictions.csv
