@@ -1,10 +1,8 @@
 # Arabic Sentiment MLOps — End-to-End Project Report
 
-> **Project snapshot:** 18 October 2026<br>
 > **Track:** Deep Learning / Arabic Sentiment Analysis (Track A in *The MLOps Practitioner — Mini Projects & Final Project Handbook*)<br>
 > **Repository:** [`MoohamedMahmoud/arabic-sentiment-mlops`](https://github.com/MoohamedMahmoud/arabic-sentiment-mlops)<br>
 > **Current development branch:** `module-3-serving-release`<br>
-> **Latest confirmed pushed commit:** `3796ec7` — `feat: finalize Arabic sentiment serving`
 
 <div align="center">
 
