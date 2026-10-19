@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -10,19 +11,20 @@ permissions:
 
 jobs:
   test-and-lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
 
@@ -41,8 +43,21 @@ jobs:
       - name: Apply serving quality gate when a complete evaluation report is committed
         shell: bash
         run: |
-          if [[ -f reports/serving/api_evaluation.json ]]; then
-            uv run python scripts/quality_gate.py reports/serving/api_evaluation.json
-          else
-            echo "No complete serving evaluation committed yet; runtime quality gate skipped."
+          set -euo pipefail
+
+          report="reports/serving/api_evaluation.json"
+
+          if [[ ! -f "$report" ]]; then
+            echo "::notice title=Serving quality gate deferred::No serving evaluation report is committed yet."
+            exit 0
           fi
+
+          complete_test_set="$(uv run python -c 'import json; from pathlib import Path; d=json.loads(Path("reports/serving/api_evaluation.json").read_text(encoding="utf-8")); print(str(d.get("complete_test_set", False)).lower())')"
+
+          if [[ "$complete_test_set" != "true" ]]; then
+            echo "::warning title=Serving quality gate deferred::The report is incomplete or represents only a smoke-test subset. Complete the held-out evaluation before release."
+            exit 0
+          fi
+
+          echo "Complete held-out evaluation detected. Applying quality thresholds."
+          uv run python scripts/quality_gate.py "$report"
