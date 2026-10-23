@@ -15,7 +15,7 @@ import random
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from statistics import mean
 from typing import Any
@@ -172,7 +172,7 @@ def main() -> int:
 
     report = {
         "benchmark": "served_api_client_batch_size_comparison",
-        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "created_at_utc": datetime.now(UTC).isoformat(),
         "api_url": args.api_url,
         "test_path": str(args.test_path),
         "test_text_pool_size": len(texts),
