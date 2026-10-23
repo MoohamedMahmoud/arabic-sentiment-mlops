@@ -1,5 +1,16 @@
 {
-  "description": "No baseline yet. Run scripts/evaluate_served_model.py successfully over the complete held-out test set to generate this reference distribution.",
-  "label_distribution": null,
-  "text_length_bin_distribution": null
+  "description": "Generated from successful API predictions on the complete held-out test set; regenerate only when intentionally changing the reference model or reference dataset.",
+  "sample_count": 8874,
+  "label_distribution": {
+    "NEGATIVE": 0.4605589362181654,
+    "NEUTRAL": 0.28825783186837955,
+    "POSITIVE": 0.25118323191345504
+  },
+  "text_length_bin_distribution": {
+    "0-20": 0.09263015551048005,
+    "21-50": 0.27079107505070993,
+    "51-100": 0.31124633761550596,
+    "101-200": 0.16801893171061527,
+    "201+": 0.15731350011268874
+  }
 }

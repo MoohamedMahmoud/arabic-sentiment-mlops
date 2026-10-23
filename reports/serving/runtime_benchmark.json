@@ -1,0 +1,74 @@
+{
+  "benchmark": "served_api_client_batch_size_comparison",
+  "created_at_utc": "2026-10-23T15:20:21.371969+00:00",
+  "api_url": "http://127.0.0.1:8000/predict",
+  "test_path": "E:\\03 Education\\Online Courses\\MLOps MENA\\Final Project\\arabic-sentiment-mlops\\data\\processed\\test.parquet",
+  "test_text_pool_size": 32,
+  "requests_per_batch_size": 10,
+  "batch_sizes": [
+    1,
+    4,
+    8
+  ],
+  "timeout_seconds": 180.0,
+  "retries": 0,
+  "notes": [
+    "Performance-only experiment; this does not recompute model-quality metrics.",
+    "Tests client request payload sizes against the same currently running service; it does not compare different server configurations or model formats.",
+    "The small default run is exploratory; increase --requests-per-size for more stable tail-latency estimates.",
+    "Failures are recorded, not retried. Do not use these results as a substitute for a full concurrency/load test."
+  ],
+  "results": [
+    {
+      "batch_size": 1,
+      "requests_attempted": 10,
+      "requests_succeeded": 10,
+      "requests_failed": 0,
+      "texts_succeeded": 10,
+      "wall_time_seconds": 8.054975,
+      "successful_texts_per_second": 1.241469,
+      "request_latency_seconds": {
+        "p50": 0.7260036499992566,
+        "p95": 1.071945555001912,
+        "p99": 1.150576071002324,
+        "mean": 0.8053832700003113,
+        "unit": "seconds per HTTP request including failures"
+      },
+      "sample_errors": []
+    },
+    {
+      "batch_size": 4,
+      "requests_attempted": 10,
+      "requests_succeeded": 10,
+      "requests_failed": 0,
+      "texts_succeeded": 40,
+      "wall_time_seconds": 11.326243,
+      "successful_texts_per_second": 3.531621,
+      "request_latency_seconds": {
+        "p50": 1.079515799998262,
+        "p95": 1.723099559999718,
+        "p99": 1.916618711999654,
+        "mean": 1.1324856999992334,
+        "unit": "seconds per HTTP request including failures"
+      },
+      "sample_errors": []
+    },
+    {
+      "batch_size": 8,
+      "requests_attempted": 10,
+      "requests_succeeded": 10,
+      "requests_failed": 0,
+      "texts_succeeded": 80,
+      "wall_time_seconds": 14.823788,
+      "successful_texts_per_second": 5.396731,
+      "request_latency_seconds": {
+        "p50": 1.6087374000017007,
+        "p95": 1.7537063350007882,
+        "p99": 1.7697291070009304,
+        "mean": 1.4822372300001008,
+        "unit": "seconds per HTTP request including failures"
+      },
+      "sample_errors": []
+    }
+  ]
+}

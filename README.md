@@ -1,10 +1,10 @@
 # Arabic Sentiment MLOps — End-to-End Project Report
 
-> **Project snapshot:** 18 October 2026<br>
+> **Project snapshot:** 24 October 2026<br>
 > **Track:** Deep Learning / Arabic Sentiment Analysis (Track A in *The MLOps Practitioner — Mini Projects & Final Project Handbook*)<br>
 > **Repository:** [`MoohamedMahmoud/arabic-sentiment-mlops`](https://github.com/MoohamedMahmoud/arabic-sentiment-mlops)<br>
-> **Current development branch:** `module-3-serving-release`<br>
-> **Latest confirmed pushed commit:** `3796ec7` — `feat: finalize Arabic sentiment serving`
+> **Last historical branch recorded:** `module-3-serving-release`<br>
+> **Last historical pushed commit in the retained project record:** `3796ec7` — `feat: finalize Arabic sentiment serving` (not asserted to be the current remote HEAD)
 
 <div align="center">
 
@@ -18,13 +18,17 @@
 ![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B?logo=streamlit&logoColor=white)
 ![Docker](https://img.shields.io/badge/Runtime-Docker-2496ED?logo=docker&logoColor=white)
 ![Local Tests](https://img.shields.io/badge/Local%20tests-29%20passed-success)
-![Served Evaluation](https://img.shields.io/badge/Full%20served%20evaluation-incomplete-orange)
+![Served Evaluation](https://img.shields.io/badge/Full%20served%20evaluation-quality%20gate%20passed-success)
+![Runtime Benchmark](https://img.shields.io/badge/Batch%20benchmark-recorded-blue)
+![Docker Hub](https://img.shields.io/badge/Supporting%20images-3%20published-blue)
 
 </div>
 
 **Document purpose.** This file is the consolidated project story, not just installation instructions. It records why the dataset was selected, what the data notebook discovered, how notebook work became package/DVC/MLflow code, which AraBERT trials were compared, how serving and observability were assembled, what every evaluation actually proved, and which handbook items still require evidence.
 
-> **Evidence rule:** the offline test metrics, small HTTP smoke test, service-health checks, and failed full HTTP evaluation are different experiments. They are reported separately below. A local service that starts is not automatically a model that passes quality or load testing.
+> **Current release snapshot (24 October 2026):** the full served evaluation completed for 8,874/8,874 rows and the configured quality gate passed (accuracy 0.8781; macro-F1 0.8702). One failure occurred in the recorded 10-user load test. The proxy, frontend, and MLflow Docker images are published as `v1.0.0`; the approximately 7.8 GB Bento image and pull-only deployment remain deferred. ONNX conversion, class-imbalance/model experiments, and dataset reconciliation are future work.
+
+> **Evidence rule:** the offline test metrics, earlier HTTP smoke test, complete served evaluation, load tests, and runtime batching benchmark are different experiments. They are reported separately. A quality-gate pass is not automatically a production-load qualification.
 
 ### Contents
 
@@ -39,37 +43,37 @@
 - [9. BentoML packaging and Docker](#9-serving-packaging-mlflow--bentoml--docker)
 - [10. UI, proxy, Prometheus, and Grafana](#10-ui-inference-proxy-prometheus-and-grafana)
 - [11. Served predictions and evaluation](#11-api-prediction-checks-and-served-model-evaluation)
-- [12. GitHub and release workflow](#12-git-ci-and-release-workflow)
+- [12. GitHub, Docker Hub, and release workflow](#12-github-docker-hub-and-release-workflow)
 - [13. Handbook checklist](#13-handbook-requirement-by-requirement-status)
 - [14. Runbook](#14-reproducible-local-runbook)
 - [15. Remaining work and conclusions](#15-known-gaps-and-prioritized-next-steps)
 - [References](#references)
+- [Appendix A — Quick-start commands](#appendix-a--quick-start-commands-windows-powershell)
 
 ---
 
 ## 1. Executive summary
 
-The project develops a three-class Arabic sentiment classifier and wraps it in an MLOps workflow. The input is Arabic review text; the output is one of `NEGATIVE`, `NEUTRAL`, or `POSITIVE`, with a confidence score. The selected model family is AraBERT, fine-tuned with PyTorch and Hugging Face Transformers.
+The project develops a three-class Arabic sentiment classifier for Arabic review text. The output is `NEGATIVE`, `NEUTRAL`, or `POSITIVE`, together with a confidence score. AraBERT v0.2 was fine-tuned using PyTorch and Hugging Face Transformers, then integrated into an MLOps workflow with DVC, MLflow, BentoML, a Streamlit UI, a FastAPI inference/observability proxy, Prometheus, Grafana, and Docker Compose infrastructure.
 
-The project evolved from data understanding and model training into package-based Python code, DVC data preparation, MLflow tracking and model registration, BentoML serving, a Streamlit interface, a FastAPI inference/observability proxy, Prometheus metrics, and a provisioned Grafana dashboard.
+Since the previous report snapshot, the full held-out set of **8,874 examples** has successfully passed through the deployed HTTP path. The served model achieved accuracy **0.8781** and macro-F1 **0.8702**; the configured quality gate passed its macro-F1 and neutral-class F1 thresholds. A separate exploratory batching benchmark also completed 30/30 requests successfully across batch sizes 1, 4, and 8. Load-test evidence shows one HTTP 502/503-related failure during the recorded 10-user run, and the full-evaluation latency tail is high. Therefore, the quality gate passed, but the service is **not qualified for unrestricted production load**.
 
 ### Current state at a glance
 
-| Area | Verified outcome | Current limitation |
+| Area | Latest verified outcome | Limitation / next step |
 |---|---|---|
-| Dataset preparation | The original GitHub-hosted corpus was supplied as `alldata.csv` plus `train.csv`, `dev.csv`, and `test.csv`; the all-data file was audited and new leakage-checked splits were prepared | The exact upstream GitHub repository URL has not been recovered from retained chat/files; 88,738 cleaned audit rows vs 88,737 prepared split rows needs reconciliation |
-| Offline AraBERT model | Held-out test accuracy **0.8757**, macro-F1 **0.8681** in the saved tuning report | These offline results must not be presented as the measured performance of the currently served MLflow version without verifying artifact identity and preprocessing parity |
-| Python quality | `ruff` checks passed; compile check passed; **29 pytest tests passed** | One non-blocking Starlette/httpx deprecation warning was reported |
-| DVC and MLflow | DVC pipeline/configuration exists; MLflow tracking/registry used; registered model `ArabicSentiment` version `2` | A fully reproducible clean-clone run still depends on data/remote credentials and the local model artifacts |
-| BentoML / Docker | Bento built and containerized as `arabic-sentiment-service:vetbwwgkosur4aav`; `/readyz` returned HTTP 200; metadata returned model version 2, batch size 8, latency 2000 ms | Full 8,874-row served-model evaluation still fails intermittently with HTTP 503 overload responses |
-| UI and service endpoints | API proxy, Streamlit, Prometheus, Grafana, and MLflow endpoint checks returned HTTP 200 | An HTTP 200 homepage/health check is not the same as a complete UI interaction or stable sustained-load test |
-| Served-model metrics | A 32-row smoke evaluation completed | Smoke metrics are not a full evaluation; quality gate intentionally rejects this artifact as incomplete |
-| GitHub | Branch `module-3-serving-release` pushed at commit `3796ec7` | This is not evidence of a merged PR to `main`; `ui/`, a change to `model.py`, and the comprehensive root README were not included in the staged commit shown in the terminal history |
-| Handbook completion | Important Module 1–3 and basic monitoring building blocks exist | Load-test acceptance, canary evidence, optimization journey (Module 4), complete Module 5 monitoring acceptance, CI result, PR merge, and peer review are not yet evidenced |
+| Dataset and provenance | Local `data/raw/alldata.csv` audited; repository [BihterDass/ArabicTextClassificationDataset](https://github.com/BihterDass/ArabicTextClassificationDataset) contains the same named CSV set and is associated with co-author Bihter Das | Local snapshot has 110,760 rows and an imbalanced distribution, unlike the paper's description of a 100K balanced per-language dataset; exact snapshot/version and license should be recorded; 88,738 audit rows vs 88,737 prepared split rows needs reconciliation |
+| Offline AraBERT model | Accuracy **0.8757**, macro-F1 **0.8681** on 8,874 held-out rows | Offline training used `max_length=160`; the registered served artifact reports `max_length=256`, so keep the results separately labelled |
+| Full served evaluation | All **8,874 / 8,874** rows evaluated through `http://127.0.0.1:8000/predict`; accuracy **0.8781**, macro-F1 **0.8702** | Tail latency is high: HTTP batch p95 **9.29 s**, p99 **22.56 s**; timings are per batch of up to eight texts |
+| Quality gate | **PASS**: macro-F1 `0.8702` ≥ `0.85`; NEUTRAL F1 `0.8311` ≥ `0.80` | These are project-specific thresholds, not a claim of general production readiness |
+| Load test and canary | 4- and 5-user recorded runs had no failures; 10-user run had 1 failure in 196 requests | 10-user reliability is not qualified; 5 users is only a provisional demonstration ceiling, not a sustained-capacity guarantee |
+| Runtime benchmark | 10 measured requests each at batch sizes 1, 4, and 8; 30/30 successful; observed throughput rose from `1.2415` to `5.3967` texts/s | Exploratory benchmark only; not the handbook's full optimization benchmark protocol and not evidence of ONNX/TensorRT optimization |
+| Python quality | A previous local check recorded Ruff and compile checks passing and **29 tests passing** | Rerun checks on the final working tree before commit; a past pass does not prove the current tree passes |
+| DVC / MLflow | DVC pipeline exists; registered model `ArabicSentiment` version `2`; current Bento tag `arabic_sentiment_v2:ui5zcfgkc2qxoaav` | A clean-clone run still depends on dataset/model artifact access and DVC/MLflow configuration |
+| Docker Hub | Proxy, frontend, and MLflow images published as `v1.0.0` under `m0hamedseleem` | Bento image remains local and is about **7.8 GB**; pull-only Compose deployment has not been completed or validated |
+| GitHub / course release | A feature branch and CI workflow were previously recorded | Current branch, working-tree changes, latest remote commit, CI result, PR merge, and final release tag must be checked locally/on GitHub; do not assume they are complete |
 
-**Central conclusion:** an offline-capable classifier and a locally running application stack have been built. The project has not yet demonstrated successful full-set inference under sustained evaluation, and the entire five-module handbook is not complete based on the recorded artifacts. The remaining gaps are stated explicitly at the end of this report.
-
----
+**Central conclusion:** the project now has a complete full-set served-model evaluation and a passing quality gate, in addition to the offline evaluation and integrated serving/monitoring stack. Remaining gaps are operational qualification at higher concurrency, full handbook optimization evidence, final image portability, reproducibility/provenance cleanup, and the GitHub/course release workflow. They are stated explicitly rather than represented as completed work.
 
 ## 2. Development environment and project setup
 
@@ -156,17 +160,28 @@ The raw file's measured properties are:
 
 The one unlabeled record is not valid supervised training data. The label distribution is also not balanced: the negative class is larger than either neutral or positive.
 
-### 4.3 Where the files came from, and what remains unverified
+### 4.3 Dataset repository and associated paper: what matches, and what does not
 
-The actual workflow began with a **GitHub-hosted repository** that contained four CSV artifacts: `alldata.csv`, `train.csv`, `dev.csv`, and `test.csv`. We downloaded those files; `alldata.csv` was the raw/unprocessed input for **our** pipeline, meaning it had not yet gone through the cleaning, duplicate-conflict policy, stratified resplitting, and DVC pipeline we implemented. The presence of pre-existing `train/dev/test` files did not mean that those splits were automatically safe to use.
+The GitHub repository used for the project file set is [BihterDass/ArabicTextClassificationDataset](https://github.com/BihterDass/ArabicTextClassificationDataset). Its root contains `alldata.csv`, `train.csv`, `dev.csv`, and `test.csv`, matching the names present in the project's download/workflow history. The repository owner name also corresponds to Bihter Das, co-author of the associated paper by Savci and Das (2023): [*Prediction of the customers' interests using sentiment analysis in e-commerce data for comparison of Arabic, English, and Turkish languages*](https://doi.org/10.1016/j.jksuci.2023.02.017). The publisher's article describes new Arabic, Turkish, and English e-commerce review/complaint datasets and compares traditional ML, deep-learning, and pretrained-language-model approaches.
 
-The precise GitHub repository URL/name is **not present in the retained chat/files I could retrieve**, and a public search did not identify a repo that could be matched confidently to this exact 110,760-row file. I have therefore not invented a repository link or cited a lookalike as the source. For a release-quality citation, this is the one source detail that still needs recovery from browser history, the original download command, shell history, or the source repository name.
+**Important data-version qualification:** the paper describes each language dataset as approximately 100K samples with equal numbers of positive, negative, and neutral examples. The local `alldata.csv` snapshot audited for this project has **110,760 rows** including one missing label and an imbalanced label distribution (`46,827 NEGATIVE`, `32,129 NEUTRAL`, `31,803 POSITIVE`). Therefore, the repository and paper are the relevant upstream source/publication pair, but the local snapshot's exact identity/version is not demonstrated to be byte-for-byte or distribution-identical to the paper's experimental dataset. This README reports the locally measured counts and does not silently replace them with the paper's reported dataset description. Before redistributing data, verify the repository's license and record the exact file hash/commit used.
 
-A related, publicly documented corpus surfaced during source checking: [Arabic 100K Reviews by Abed Khooli (Kaggle)](https://www.kaggle.com/datasets/abedkhooli/arabic-100k-reviews). A public Hugging Face copy describes 99,999 examples with numeric sentiment labels. This is **a candidate/reference only, not a confirmed identity** for our file: the local raw file has 110,760 rows and already uses string labels. Do not replace the missing original GitHub citation with this Kaggle link unless the original mirror can be shown to derive from that exact dataset.
+#### Paper-to-project comparison
 
-Another related paper is [GLARE: Google Apps Arabic Reviews Dataset](https://arxiv.org/abs/2412.15259). GLARE documents a large Saudi Google Play review collection, but its scale and released dataset structure differ greatly from our small labeled corpus. It is relevant background for Arabic app-review NLP, not a verified source of `alldata.csv`.
+| Dimension | Savci & Das (2023) paper | This project | Interpretation |
+|---|---|---|---|
+| Task/domain | Three-class sentiment on e-commerce product reviews and complaints in Arabic, English, and Turkish | Three-class Arabic sentiment on the local Arabic review corpus | Same broad task/domain for Arabic, but the exact local snapshot is not confirmed to be identical to the paper's experimental split |
+| Dataset scale and balance | Paper describes datasets limited to about 100K samples per language with equal positive/negative/neutral samples | Raw local file: 110,760 rows; class counts are imbalanced; cleaned split total is 88,737, with an audit-preview discrepancy of one row | Do not claim the local snapshot is balanced or exactly the same size as the paper's dataset |
+| Methods | Compares traditional ML (e.g. SVM, RF, MNB), deep-learning methods (e.g. CNN/RNN/LSTM), and multiple pretrained language models | Fine-tuned AraBERT v0.2 using PyTorch/Transformers; built DVC/MLflow tracking and a deployed BentoML API | The engineering contribution here is a reproducible deployment/monitoring pipeline around one Arabic transformer model, not a broader model-family comparison |
+| Evaluation design | Paper reports a 70/20/10 split and k=10 validation, and compares models within its own dataset/protocol | Stratified train/validation/test split; validation-driven selection; held-out test metrics plus a separate full served-API evaluation | Metrics are not directly comparable unless dataset version, labels, split, preprocessing, and protocol are aligned |
+| Reported result | Paper reports 95.1% accuracy for multilingual BERT on its Arabic dataset; it also reports 91.3% for an SVM result in a separate comparison | Offline test: accuracy 0.8757, macro-F1 0.8681; served API: accuracy 0.8781, macro-F1 0.8702 | The paper's accuracy is not a valid baseline for a direct “we improved” claim because the corpus snapshot and evaluation protocol are not proven identical |
+| MLOps scope | Primarily a comparative sentiment-analysis experiment | Adds package-based code, DVC, MLflow registry, BentoML, API proxy, UI, Prometheus/Grafana, quality gate, load testing, and container images | These are workflow/deployment contributions, not proof of superior model accuracy versus the paper |
 
-**Release note:** dataset provenance is a real reproducibility requirement. Until the exact GitHub URL, upstream license, and any original dataset/paper citation are recovered, document the verified local processing lineage without claiming an unverified upstream identity.
+The defensible result is that the project reached **macro-F1 0.8702 on its own complete held-out served evaluation** and passed its configured quality gate, while implementing the MLOps serving and monitoring path. It would be inaccurate to say that it outperformed the paper's 95.1% Arabic accuracy because the evaluation sets and protocols are not comparable. The local neutral class is also the weakest class (`F1=0.8311` in the served evaluation), so further data/imbalance and error-analysis work remains justified.
+
+A separate candidate considered during dataset selection was the [KAUST Arabic Sentiment Analysis 2021 competition](https://www.kaggle.com/c/arabic-sentiment-analysis-2021-kaust/data) and its [overview paper](https://arxiv.org/abs/2109.14456). That is a tweet corpus rather than the e-commerce-review corpus used here. It remains a methodology/reference option for future cross-domain evaluation, not the source of the current local `alldata.csv`.
+
+Other related corpora were considered in the earlier research notes, including [Arabic 100K Reviews by Abed Khooli](https://www.kaggle.com/datasets/abedkhooli/arabic-100k-reviews) and [GLARE: Google Apps Arabic Reviews Dataset](https://arxiv.org/abs/2412.15259). They are useful context or possible future external-evaluation datasets, but neither is claimed as the source of the current `alldata.csv`. A cross-domain evaluation should be kept separate from the primary test set and should not silently mix different domains into training.
 
 ### 4.4 Model research reference: AraBERT
 
@@ -422,7 +437,7 @@ Recorded outputs:
 - Pytest: **29 passed, 1 warning, in 11.30 seconds**.
 - Warning: `StarletteDeprecationWarning` indicates use of `httpx` with `starlette.testclient` is deprecated and suggests `httpx2`. It did not fail the test suite; it remains a dependency/test cleanup item.
 
-These checks establish useful local code quality. They do not imply that load testing or the production quality gate passed.
+These checks establish useful local code quality. The later full served-model quality gate passed, but the load tests still show a reliability limitation at ten concurrent users.
 
 
 ### 7.2 Component map: what each area owns
@@ -439,12 +454,12 @@ These checks establish useful local code quality. They do not imply that load te
 | `monitoring/prometheus.yml`, `monitoring/grafana/`, `monitoring/alerts.yml` | Prometheus scrape configuration, provisioned Grafana dashboard/datasource, and alert definitions | Files exist; a file existing does not prove every alert is routed or tested end-to-end |
 | `docker/docker-compose.yml` | MLflow + PostgreSQL + RustFS infrastructure | Separate Compose project; keep it separate from the UI/observability stack |
 | `docker/docker-compose.observability.yml` | UI + inference proxy + Prometheus + Grafana | Does not require rebuilding when only the Bento model image changes |
-| `scripts/evaluate_served_model.py`, `scripts/quality_gate.py` | Evaluate real HTTP predictions and enforce minimum quality thresholds | Smoke run passed; complete held-out served evaluation remains incomplete |
-| `loadtest/locustfile.py`, `reports/locust/` | Synthetic load and performance evidence | Script exists, but final successful load report was not verified in the retained output |
+| `scripts/evaluate_served_model.py`, `scripts/quality_gate.py` | Evaluate real HTTP predictions and enforce minimum quality thresholds | Full 8,874-row evaluation completed and passed the configured quality gate; tail latency remains high |
+| `loadtest/locustfile.py`, `reports/locust/` | Synthetic load and performance evidence | Reports exist for 2, 3, 4, 5, and 10 users; the recorded 10-user run had one failure in 196 requests |
 | `docs/`, `reports/` | Runbook, integration map, evaluation output and supporting evidence | Keep smoke-test artifacts labelled as smoke tests; do not replace with partial results and call them final |
 | `.github/workflows/ci.yml` | GitHub Actions CI definition | Local test pass is confirmed; a green remote Actions run is not yet confirmed |
 
-The last confirmed feature-branch commit (`3796ec7`) did **not** include every current working-copy file: `ui/` was untracked, `src/arabic_sentiment_mlops/model.py` was modified but unstaged, and the root README was not updated in that commit. The final PR should include the intended version of those files after reviewing them, while excluding local Word documents, `.bak` files, secrets, virtual environments, and raw data.
+At the time of the historical `3796ec7` commit, not every working-copy file was included: `ui/` was untracked, `src/arabic_sentiment_mlops/model.py` was modified but unstaged, and the comprehensive root README was not included in that commit. The current Git state has not been verified by this document; inspect it before staging. Exclude local Word documents, `.bak` files, secrets, virtual environments, and raw data.
 
 ---
 
@@ -505,8 +520,8 @@ The packaging was corrected by building the local project wheel and adding it to
 
 ```powershell
 uv build --wheel
-Copy-Item .\dist\arabic_sentiment_mlops-0.1.0-py3-none-any.whl `
-          .\wheels\arabic_sentiment_mlops-0.1.0-py3-none-any.whl -Force
+New-Item -ItemType Directory -Force .\wheels | Out-Null
+Copy-Item .\dist\arabic_sentiment_mlops-*.whl .\wheels\ -Force
 uv run bentoml build
 ```
 
@@ -552,7 +567,7 @@ The BentoML service uses a batchable prediction API, loads the MLflow model at s
 
 An earlier service configuration reported a maximum batching latency of `100 ms`; the latest build reports `2000 ms` with `max_batch_size=8`. Vectorized inference was also introduced in the model class to avoid implementing a batch as a loop of one-row forward passes. The intent was to reduce repeated model-call overhead and improve the serving behavior under a sustained evaluation.
 
-This was a reasonable optimization hypothesis, but only measurement can establish whether it helped. The full test-set run advanced farther in the newer configuration but still encountered overload, so the serving optimization cannot yet be called successful under load.
+This was a reasonable optimization hypothesis. The complete 8,874-row evaluation later succeeded with retries, but the high batch-latency tail and one 10-user load-test failure show that stable operation under load is not yet qualified. The separate runtime benchmark shows higher throughput for larger client batches; it does not isolate the effect of the adaptive-batching setting or prove production capacity.
 
 ---
 
@@ -620,277 +635,486 @@ The Compose file binds user-facing ports to loopback for local development. Chan
 
 ## 11. API prediction checks and served-model evaluation
 
-### 11.1 Small prediction checks
+### 11.1 Small prediction checks and the earlier smoke test
 
-Arabic strings were sent through both the direct BentoML endpoint and the proxy. UTF-8 input encoding worked, and direct/proxy outputs agreed for the same examples. For example, a clearly positive text was classified `POSITIVE`, a negative text `NEGATIVE`, and one short text intended as neutral was classified `NEGATIVE` with high confidence.
+Arabic strings were sent through both the direct BentoML endpoint and the proxy. UTF-8 input encoding worked, and direct/proxy outputs agreed for the same examples. Clearly positive and negative examples were classified accordingly; one short example intended as neutral was classified as `NEGATIVE` with high confidence. Agreement between direct service and proxy confirms the request path, not the correctness of that neutral prediction. Confidence is not the same as correctness or calibration.
 
-The agreement between the direct service and proxy demonstrates that Arabic bytes/JSON transport were not the reason for that example's misclassification. It does **not** prove the neutral prediction was correct. Short or ambiguous review text is a model error-analysis concern, and confidence is not the same thing as correctness or calibration.
+#### Historical 32-row smoke test (retained for traceability)
 
-### 11.2 The successful 32-row smoke test
-
-A small test-set subset was evaluated through the HTTP proxy with batch size 4:
+The earlier subset run used batch size 4:
 
 ```powershell
+# Historical smoke-test command; this is not the full evaluation.
 uv run python scripts/evaluate_served_model.py --limit 32 --batch-size 4
 ```
 
-Recorded metrics:
-
-| Metric | Value |
+| Metric | Historical smoke-test result |
 |---|---:|
 | Rows evaluated | 32 |
-| Accuracy | **0.7500** |
-| Macro-F1 | **0.7579** |
-| Negative F1 | 0.7500 |
-| Neutral F1 | 0.6667 |
-| Positive F1 | 0.8571 |
+| Accuracy | 0.7500 |
+| Macro-F1 | 0.7579 |
+| NEGATIVE F1 | 0.7500 |
+| NEUTRAL F1 | 0.6667 |
+| POSITIVE F1 | 0.8571 |
 | HTTP batch-latency p50 | 2.1068 s |
 | HTTP batch-latency p95 | 2.3534 s |
 | HTTP batch-latency p99 | 2.4306 s |
 | Mean HTTP batch latency | 2.0254 s |
 
-The latency numbers are **seconds per HTTP batch**, not per item. Batch size was 4. With just 32 rows, this is a smoke test used to validate plumbing and basic output shape, not a statistically robust model-quality estimate. Its macro-F1 of 0.7579 must not be compared directly with the 8,874-row offline report as if they came from the same fully evaluated service/model artifact.
+These latencies are seconds per HTTP batch, not per item. Because the run evaluated only 32 rows, it was useful for checking request/response plumbing but not for estimating final model quality. That subset run did not update `monitoring/reference_distribution.json`.
 
-The script saved `reports/serving/api_evaluation.json` and `reports/serving/api_test_predictions.csv`. Because the run was only a subset, it did not update `monitoring/reference_distribution.json`.
+#### Earlier full-evaluation failures and diagnosis (historical)
 
-### 11.3 Full held-out API evaluation: failure and diagnosis
-
-The full evaluator was launched with:
-
-```powershell
-uv run python scripts/evaluate_served_model.py --batch-size 8 --retries 5
-```
-
-The intended evaluation size is **8,874 test rows**, sent through `http://127.0.0.1:8000/predict` in batches of up to 8. In the earlier attempt, the evaluator failed around 200 rows. In the later run with the new container/configuration, it progressed to approximately **1,400 / 8,874** before failing after repeated retries. The failure was:
+Before the successful full run below, the evaluator was attempted with five retries and failed around 200 rows in one attempt and around 1,400 / 8,874 rows in a later attempt. The reported exception was:
 
 ```text
 RuntimeError: HTTP 502: {"detail":"BentoML returned HTTP 503."}
 Request failed after 6 attempts
 ```
 
-BentoML logs contain the diagnostic:
+BentoML logs reported `bentoml.exceptions.ServiceUnavailable: process is overloaded`, with cancelled batched requests and HTTP 503 responses after roughly 2.3–2.7 seconds. Individual requests and metadata could still return HTTP 200, so health checks and single predictions had not exposed the saturation behavior. This was evidence of overload/dispatcher pressure, not proof of one definitive root cause.
 
-```text
-bentoml.exceptions.ServiceUnavailable: process is overloaded
+At that earlier point, the quality gate correctly rejected the incomplete report with `Quality gate requires a complete held-out test-set evaluation, not a smoke-test subset.` The later full run with retries processed all 8,874 rows and passed the gate, as recorded in the next section. The retries enabled completion; they did not prove the overload/latency issue was eliminated.
+
+### 11.2 Full held-out API evaluation — completed
+
+The full test set was successfully evaluated through the deployed proxy:
+
+```powershell
+# Run from the repository root after BentoML and the proxy are healthy.
+uv run python scripts/evaluate_served_model.py `
+  --api-url http://127.0.0.1:8000/predict `
+  --test-path data/processed/test.parquet `
+  --batch-size 8 `
+  --retries 10 `
+  --timeout 180
 ```
 
-They also show cancelled requests during batched inference and several HTTP 503 responses after roughly 2.3–2.7 seconds. At other times, individual requests and metadata returned HTTP 200, with individual `/predict` examples taking roughly 0.56–0.95 seconds in the later logs. Therefore, the service can start and answer individual requests, but the sustained batch evaluation exposes an overload/dispatcher limitation that the basic health checks don't reveal.
+The evaluator processed **8,874 / 8,874** rows and wrote:
 
-The logs are consistent with a saturation or batch-processing/dispatcher timeout problem. They do not prove a single definitive root cause. The responsible next step is to diagnose actual worker/batch/timeout behavior from measured traces and runtime configuration, changing one parameter at a time—not to rebuild unrelated services or to invent a success result.
+- `reports/serving/api_evaluation.json` — aggregate metrics and completeness flag;
+- `reports/serving/api_test_predictions.csv` — predictions for the held-out examples;
+- `monitoring/reference_distribution.json` — updated reference distribution after the complete run.
 
-### 11.4 Quality gate outcome
+| Metric | Full served result |
+|---|---:|
+| Test rows | **8,874 / 8,874** |
+| Accuracy | **0.8781** |
+| Macro-F1 | **0.8702** |
+| NEGATIVE F1 | 0.9139 |
+| NEUTRAL F1 | 0.8311 |
+| POSITIVE F1 | 0.8654 |
+| HTTP batch latency p50 | 2.99 s |
+| HTTP batch latency p95 | 9.29 s |
+| HTTP batch latency p99 | 22.56 s |
+| Mean HTTP batch latency | 3.98 s |
 
-The project quality gate sets the minimum thresholds:
+Latency is measured **per HTTP request/batch of up to eight texts**, not per individual text. The evaluator used retries because the serving stack had previously returned transient HTTP 502/503 overload responses. Completion proves that the full evaluation eventually succeeded; it does not prove that overload or tail latency has been resolved.
 
-- Macro-F1 ≥ **0.85**
-- Neutral-class F1 ≥ **0.80**
+### 11.3 Quality gate — passed
 
-Those are project release thresholds, not universal scientific standards. When `scripts/quality_gate.py` was run against the current serving evaluation artifact, it returned:
+The configured project thresholds are macro-F1 ≥ `0.85` and neutral-class F1 ≥ `0.80`. Run the gate with:
 
-```text
-Quality gate requires a complete held-out test-set evaluation, not a smoke-test subset.
+```powershell
+# Validate the complete evaluation artifact against the configured thresholds.
+uv run python scripts/quality_gate.py reports/serving/api_evaluation.json
 ```
 
-This is the correct fail-closed behavior. The test-set evaluation was incomplete, so the quality gate **has not passed**. There are no final full-set serving metrics to report. The smoke-test JSON committed in the current branch is a partial diagnostic result and must be labeled accordingly, never presented as the final held-out evaluation.
+Recorded outcome:
 
-### 11.5 Conclusion of serving validation
+```text
+macro-F1=0.8702 (minimum 0.8500)
+NEUTRAL F1=0.8311 (minimum 0.8000)
+QUALITY GATE PASSED
+```
 
-- Service readiness and metadata work.
-- The existing application endpoints responded during health checks.
-- Single Arabic predictions can reach the model and return valid structured output.
-- The full test run still encounters overload and is not a completed validation.
-- Served-model quality, stable full-set latency, and the project quality gate remain unresolved. The local project should not claim production load readiness until those checks pass.
+The gate pass applies to the current served evaluation artifact and the configured quality thresholds. It is not a latency SLO or production-capacity sign-off.
+
+### 11.4 Model/configuration parity caveat
+
+The offline selected training configuration used `max_length=160`, while the currently bundled MLflow/Bento artifact reports `max_length=256`. Therefore, the offline and served metrics are presented separately. The deployed artifact's recorded `max_length=256` matches the Bento service's serving metadata; this does not prove that the offline checkpoint and served artifact are identical in every other respect. Future comparisons should record the checkpoint/run ID, MLflow version, Bento model tag, preprocessing/tokenizer, and maximum sequence length together.
+
+### 11.5 Load testing and canary qualification
+
+The recorded Locust workload tests single predictions, batches of 2–8 texts, and health checks. These are existing results; no additional load test is implied by this README.
+
+| Concurrent users | Duration | Requests | Failures | Recorded latency evidence |
+|---:|---:|---:|---:|---|
+| 4 | 60 s | 88 | 0 | Average about 560 ms; p95 about 880 ms; maximum about 973 ms |
+| 5 | 60 s | 103 | 0 | Average about 708 ms; p95 about 1,100 ms; maximum about 1,311 ms |
+| 10 | 60 s | 196 | 1 (0.51%) | Average about 818 ms; p95 about 1,800 ms; p99 about 2,700 ms; maximum about 2,915 ms; one proxy HTTP 502 / BentoML HTTP 503 |
+
+The BentoML logs identified `bentoml.exceptions.ServiceUnavailable: process is overloaded`. A point-in-time Docker resource snapshot showed BentoML at approximately `847.5 MiB` and the proxy at `40.79 MiB`; this was not a peak-under-load resource measurement. HTML/CSV reports are stored in `reports/locust/`. The qualification notes are recorded in `reports/serving/canary_qualification.md`.
+
+**Canary decision:** NO-GO for an unrestricted production claim at ten concurrent users. Five users is only a provisional ceiling for a controlled demonstration based on the observed run, not a guaranteed sustained capacity. A future promotion should specify acceptable error rate and latency limits and capture resource measurements under the target workload.
+
+### 11.6 Runtime batching benchmark
+
+The exploratory script `scripts/benchmark_served_model.py` sends requests through the existing proxy, uses no retries so failures remain visible, and saves `reports/serving/runtime_benchmark.json`. The recorded run used ten measured requests per client batch size; all 30 requests succeeded.
+
+```powershell
+# Re-run only when the model/service or benchmark setup changes; this is a small exploratory run.
+uv run python scripts/benchmark_served_model.py --requests-per-size 10
+```
+
+| Client batch size | Successful requests | Throughput (texts/s) | Request p50 | Request p95 |
+|---:|---:|---:|---:|---:|
+| 1 | 10/10 | 1.2415 | 0.726 s | 1.072 s |
+| 4 | 10/10 | 3.5316 | 1.080 s | 1.723 s |
+| 8 | 10/10 | 5.3967 | 1.609 s | 1.754 s |
+
+Batch size 8 achieved about **4.35× the observed throughput** of batch size 1 in this small run, while the request itself took longer because it carried more texts. This supports client batching as a throughput technique; it does not isolate the effect of the adaptive-batching setting, establish a production SLO, or complete the handbook's optimization journey.
+
+### 11.7 Conclusion of serving validation
+
+- The full 8,874-row HTTP evaluation completed and its quality gate passed.
+- The current service can return valid predictions and the proxy path works.
+- Transient 502/503 overload responses occurred during prior sustained requests; retries made the complete evaluation finish.
+- Tail latency remains high, and the recorded 10-user load test had one failure in 196 requests.
+- **Quality acceptance passed; unrestricted production-load qualification did not.**
 
 ---
 
-## 12. Git, CI, and release workflow
+## 12. GitHub, Docker Hub, and release workflow
 
-The repository has been maintained with feature branches rather than doing all Module 3 work directly on `main`. At the latest confirmed push, the branch was `module-3-serving-release` and the pushed commit was:
+The previously confirmed feature-branch milestone was `module-3-serving-release` at commit `3796ec7` (`feat: finalize Arabic sentiment serving`). This is historical context, not a claim that it is still the current branch or latest remote commit. Check the current state with `git branch --show-current`, `git status --short`, and `git log -5 --oneline` before finalizing. The earlier Module 2 tag `v0.2.0` should not be overwritten.
 
-```text
-3796ec7 feat: finalize Arabic sentiment serving
-```
+A GitHub Actions workflow exists at `.github/workflows/ci.yml`, but the workflow file itself does not prove a green remote Actions run. Verify the Actions tab and the PR status before claiming CI passed, PR merged, or a release tag created.
 
-The previous Module 2 milestone already had tag `v0.2.0`; it should not be overwritten for a new milestone. The intended workflow is to finish the staged changes, push the feature branch, open a pull request into `main`, review CI and the README, merge the PR, then add a new tag after merge.
+### Docker Hub images published
 
-A GitHub Actions workflow at `.github/workflows/ci.yml` is included in the branch. The workflow file's presence is evidence that a CI definition exists; no successful GitHub Actions run is established by the local terminal output recorded for this report. The result should be checked in the GitHub Actions tab before writing “CI passed.”
+The following three supporting images were successfully pushed to Docker Hub under `m0hamedseleem` with tag `v1.0.0`:
 
-### Repository hygiene noted during the final push
+| Component | Published image | Approximate local image size at push |
+|---|---|---:|
+| Inference proxy | [`m0hamedseleem/arabic-sentiment-inference-proxy:v1.0.0`](https://hub.docker.com/r/m0hamedseleem/arabic-sentiment-inference-proxy) | 162 MB |
+| Streamlit frontend | [`m0hamedseleem/arabic-sentiment-frontend:v1.0.0`](https://hub.docker.com/r/m0hamedseleem/arabic-sentiment-frontend) | 563 MB |
+| MLflow | [`m0hamedseleem/arabic-sentiment-mlflow:v1.0.0`](https://hub.docker.com/r/m0hamedseleem/arabic-sentiment-mlflow) | 955 MB |
 
-The terminal history showed that `src/arabic_sentiment_mlops/model.py` was modified but unstaged, and `ui/` was untracked at the time the `3796ec7` commit was created. The comprehensive README itself also needs to be copied into the root `README.md`. Thus, the successful push is real, but that commit does not by itself represent every local file currently used to run the latest UI/model changes. Before merging, review the working tree and explicitly stage the intended files. Do not include the accidental `notebooks/New Microsoft Word Document.docx`, `.bak` files, local `.env` credentials, raw dataset, caches, or generated model binaries unless there is a deliberate, documented reason.
+The Bento image is locally available as `arabic-sentiment-service:vetbwwgkosur4aav` (approximately **7.8 GB**) and was locally tagged as `m0hamedseleem/arabic-sentiment-bento:v1.0.0`, but the Bento tag **has not been pushed**. The local image inspection identified large components of approximately **3.2 GB of NVIDIA libraries, 1.2 GB of PyTorch, 897 MB of Triton, and 519 MB of bundled model files**. These are diagnostic clues for a future size-reduction investigation, not permission to remove dependencies without testing. Uploading the image was deferred because it would consume a large amount of bandwidth and affect the shared connection. No data or local images were deleted as part of deferring the upload.
 
-Suggested review before the next commit:
+The current development Compose files still use local `build:` contexts for MLflow, proxy, and frontend, while BentoML is run as a separate container. A clean pull-only Compose file and clean pull-only deployment test are not complete. The published supporting images alone do not make the full deployment pull-only until the Compose configuration references published image tags and the Bento image is also available remotely.
+
+### Repository hygiene and final workflow
+
+Before committing, inspect the working tree and staged changes. Explicitly stage intended source, docs, scripts, reports, and configuration files, including `scripts/benchmark_served_model.py`, `reports/serving/runtime_benchmark.json`, and `reports/serving/canary_qualification.md` if those are the reviewed artifacts you intend to publish; do not blindly run `git add .`. Exclude `.env`, tokens, raw data, `.venv`, caches, backup files, accidental Word documents, and generated model binaries unless there is a deliberate and documented reason to include them.
 
 ```powershell
+# Show the current branch and all modified/untracked files.
+git branch --show-current
 git status --short
-git diff
+
+# Check for whitespace errors and inspect the README change before staging.
+git diff --check
+git diff -- README.md
+
+# After explicitly staging only the intended files, inspect the staged patch.
 git diff --cached --check
 git diff --cached --stat
 ```
 
-Once intended changes are staged and reviewed, commit and push the feature branch. Then create the pull request to `main`; do not claim the release is merged until that step is verified.
+Once local checks pass and the intended changes are staged, commit and push the active feature branch, open a PR into `main`, review CI and the README, merge the PR, and only then create a new release tag if required. This README does not claim that the final commit, push, PR merge, or new tag has already happened.
 
 ---
 
 ## 13. Handbook requirement-by-requirement status
 
-The handbook describes a sequence of reusable modules, and the final project is meant to combine them. The state below is based on artifacts and outputs recorded so far, not on intentions alone.
+The handbook describes reusable modules and the final project combines them. The status below distinguishes completed evidence from partial implementation and future work.
 
-| Handbook area | Requirement or expected evidence | State in this project |
+| Handbook area | Requirement or expected evidence | Current state |
 |---|---|---|
-| Module 1 — production-ready package | `pyproject.toml`, `src/` package, OOP/model loading, type hints, installed package, tests | **Partially implemented and locally checked.** `src/` package, project config, model class, wheel, and 29 passing tests are evidenced. A clean-clone three-command runbook and all packaging acceptance evidence still need consolidation. |
-| Module 1 — API and container | Health/metadata/prediction contract, container image, independent run, documented image/dependency choices | **Partially implemented.** BentoML image is built and `/readyz` and metadata respond. Full clean-clone portability and all handbook serialization/image-size comparisons are not evidenced. |
-| Module 2 — experiment tracking and versioning | MLflow runs/registry, DVC data versioning/pipeline, CI and quality gate | **Partially implemented.** DVC pipeline configuration and MLflow registry version 2 are used. The actual served model quality gate is blocked because full HTTP evaluation fails. A clean-clone DVC-remote recovery and green CI run are not verified here. |
-| Module 3 — production serving | BentoML/model loaded once, batch inference, API health/metadata, request validation | **Partially implemented.** BentoML model v2 is running and single predictions work. A long full-set batch evaluation still triggers overload. |
-| Module 3 — load test and canary | Locust workload, p50/p95/p99, requests per second, failure rate/saturation, before/after evidence, canary release | **Not yet evidenced as complete.** A Locust file exists, but a final results CSV/report and a demonstrated canary decision are not available in the recorded outputs. |
-| Module 4 — optimization journey | Benchmark harness with warmup/repetition/synchronization, baseline, pruning, PTQ, QAT, distillation, ONNX Runtime/OpenVINO, TensorRT, edge path, same-test accuracy/latency/size/memory table and cost model | **Not completed in the retained evidence.** There is no verified `optimization/benchmark.py`/results journey or ONNX/TensorRT/Triton before/after benchmark table. The new vectorized batch path and batch-latency setting are serving code changes, not proof that the full Module 4 requirements are complete. |
-| Module 5 — monitoring | Metrics contract, Prometheus, Grafana-as-code, drift detection and history, tested alerting/runbook, capacity evidence | **Partially implemented.** Proxy metrics, a Prometheus config, a Grafana dashboard, an alerts YAML, and runbook exist. The full module's multi-method drift testing, scheduled/historical drift pipeline, external Alertmanager delivery, SLO burn-rate evidence, and saturation/capacity report are not all verified. |
-| Final project — documentation/release | Root README with reproducible setup and evidence, PR merged, release tag, peer review | **In progress.** Feature branch pushed at `3796ec7`; this updated README is a generated file that still needs copying to the local repository and committing. PR merge/tag and the required review of another student's project (including the written review and PDF described by the handbook) are not evidenced yet. |
+| Module 1 — production-ready package | `pyproject.toml`, `src/` package, OOP/model loading, type hints, editable installation, tests | **Implemented with prior local evidence.** Package/configuration and 29 passing tests were previously recorded; rerun the checks on the final tree before release. |
+| Module 1 — API and container | Health/metadata/prediction contract, container image, independent run, documented image/dependency choices | **Partially implemented.** BentoML container and `/readyz`/metadata work locally; Bento image is not published and clean-clone portability has not been demonstrated. |
+| Module 2 — experiment tracking and versioning | MLflow runs/registry, DVC data versioning/pipeline, CI and quality gate | **Partially implemented.** DVC pipeline and MLflow model version 2 are used; the served quality gate now passes. Clean-clone DVC/model-artifact recovery and a green remote CI run still need verification. |
+| Module 3 — production serving | Model loaded once, batch inference, health/metadata, request validation | **Implemented locally, with performance limitations.** Full served evaluation completed; transient overload and high tail latency remain. |
+| Module 3 — load test and canary | p50/p95/p99, throughput, error rate, saturation/resource evidence, explicit canary decision | **Measured but not fully production-qualified.** 4/5-user runs had zero observed failures; the 10-user run had one failure in 196 requests. Current decision is NO-GO for unrestricted 10-user production claims; five users is only a provisional controlled-demo ceiling. |
+| Module 4 — optimization journey | Reusable benchmark harness with sufficient warmup/repetitions, baseline, pruning, PTQ/QAT, distillation, ONNX Runtime/OpenVINO, TensorRT/edge path, accuracy/latency/size/memory/cost comparisons | **Partially started; handbook requirement not complete.** An exploratory 30-request batching benchmark exists, but it is not the full required optimization study. ONNX conversion and other optimization paths remain future work. |
+| Module 5 — monitoring | Metrics contract, Prometheus, Grafana-as-code, drift detection/history, tested alerting/runbook, capacity evidence | **Partially implemented.** Proxy metrics, Prometheus, Grafana dashboard/provisioning, alert definitions, and reference distribution exist; full multi-method drift/history, external alert routing, and all SLO/saturation acceptance evidence are not verified. |
+| Docker publication / portability | Publish custom images, release Compose references, validate pull-only deployment | **Partially complete.** Proxy, frontend, and MLflow images were pushed as `v1.0.0`; 7.8 GB Bento image is not pushed, and a pull-only deployment has not been tested. |
+| Final project / course requirements | README/runbook, PR merged, release tag, peer review | **In progress.** Merge and verify final docs/code, remote CI, PR state, and tag. The separate required peer review of another student's project remains a course deliverable and is not replaced by this project's README. |
 
 ### Handbook-specific optimization note
 
-Module 4 is unusually evidence-heavy. The handbook calls for a reusable benchmark harness, baseline measurement before optimization, at least 50 warmup iterations and at least 500 measured iterations, GPU synchronization when timing CUDA, fixed seeds and a fixed evaluation set, accuracy deltas, p50/p95/p99 at specified batch sizes, throughput, model size, memory/utilization, and results written to a comparison artifact. It then asks for multiple optimization techniques—including pruning, post-training quantization, quantization-aware training, distillation, TensorRT, ONNX Runtime/OpenVINO and an edge path—followed by a redeployment and re-benchmark.
+The handbook's Module 4 expects a reusable benchmark harness, baseline measurement before optimization, at least 50 warmup and 500 measured iterations, GPU synchronization when timing CUDA, a fixed evaluation set/seed, accuracy deltas, p50/p95/p99, throughput, model size, memory/utilization, and a results artifact. It also asks for multiple optimization techniques such as pruning, PTQ, QAT, distillation, TensorRT, ONNX Runtime/OpenVINO and an edge path, followed by redeployment and re-benchmarking.
 
-The current project has not produced that evidence in the saved state described here. TensorRT/FP16, TensorRT/INT8, Triton deployment, ONNX INT8 and distillation must not be claimed as complete merely because Track A lists them or because a containerized AraBERT service runs.
+The current `scripts/benchmark_served_model.py` run is an **initial client-batching benchmark**, not evidence that the full Module 4 rubric is complete. TensorRT/FP16, TensorRT/INT8, Triton deployment, ONNX INT8, pruning, quantization-aware training, and distillation must not be claimed as implemented without runnable artifacts and measured before/after results.
 
 ### Peer-review requirement
 
-The handbook also says that a project certificate requires reviewing at least one other student's project, giving detailed feedback (at least 300 words), and submitting the review in the form the instructor requests. No proof of a completed peer review is present in this project history; it remains a separate course requirement from model deployment.
+The handbook also requires a review of at least one other student's project, with detailed feedback and submission in the form requested by the instructor. No proof of completion is present in the current project evidence; this remains separate from model deployment and documentation.
 
 ---
 
 ## 14. Reproducible local runbook
 
-These commands describe the separate runtime stacks. They assume the `.env` file, DVC remote configuration, raw/prepared data, and MLflow model artifact are already present on the machine.
+These commands are for **Windows PowerShell** from the repository root. They assume the `.env` file, DVC remote configuration, source/prepared data, and required MLflow/Bento model artifacts are available. The infrastructure Compose file and the UI/observability Compose file are separate on purpose. Do not run a replacement Bento container if `arabic-sentiment-bento` already exists and is serving traffic.
 
-### 14.1 Python environment and tests
+### 14.1 Python environment and checks
 
 ```powershell
+# Synchronize the locked Python environment and project dependency groups.
 uv sync --all-groups
+
+# Run lint, tests, and Python bytecode compilation against the current tree.
 uv run ruff check src tests scripts monitoring loadtest serving
 uv run pytest -q
 uv run python -m compileall src serving scripts monitoring loadtest
 ```
 
-The exact file globs may be adjusted to the current package structure, but any reported failures should be fixed rather than hidden.
+A previous local check recorded 29 tests passing and Ruff/compile checks passing. Rerun them after the final README/code changes; the earlier result is historical evidence, not a guarantee about the current working tree.
 
-### 14.2 DVC preparation/training pipeline
+### 14.2 Inspect or reproduce the DVC pipeline
 
 ```powershell
+# Show whether tracked inputs/outputs differ from the last DVC run.
 uv run dvc status
+
+# Reproduce preparation/training stages whose dependencies have changed.
 uv run dvc repro
 ```
 
-The raw corpus is deliberately not documented as a Git-tracked file. Configure DVC remote access appropriately and do not place secret credentials in the README.
+A clean-clone reproduction depends on retrieving the raw dataset/model artifacts and configuring DVC/MLflow access. Keep raw data and credentials out of normal Git commits.
 
-### 14.3 Start MLflow infrastructure
+### 14.3 Start MLflow, PostgreSQL, and RustFS
 
 ```powershell
-docker compose --env-file .env -f docker/docker-compose.yml --project-directory . up -d
+# Start the separate MLflow infrastructure stack; .env must contain required secrets.
+docker compose --env-file .env -f docker/docker-compose.yml --project-directory . up -d --build
+
+# Inspect the services and health status belonging to this Compose project.
+docker compose --env-file .env -f docker/docker-compose.yml --project-directory . ps
 ```
 
-Check `http://127.0.0.1:5000` for MLflow and inspect Compose health for PostgreSQL and RustFS.
+MLflow is at `http://127.0.0.1:5000`; PostgreSQL and RustFS are internal dependencies except for the local RustFS ports configured in Compose.
 
-### 14.4 Build the application wheel and Bento image
+### 14.4 Build/import and start BentoML (only if needed)
 
-Build the project wheel before BentoML build because the Bento includes the wheel:
+The currently used Bento image exists locally, but is not published to Docker Hub. On a machine that has the model artifacts and dependencies, build the package wheel and Bento image using the exact tags produced by the commands:
 
 ```powershell
+# Build the package wheel that Bento includes.
 uv build --wheel
-Copy-Item .\dist\arabic_sentiment_mlops-0.1.0-py3-none-any.whl `
-          .\wheels\arabic_sentiment_mlops-0.1.0-py3-none-any.whl -Force
+
+# Copy the generated wheel into the repository's Bento wheel directory if that is the path configured in bentofile.yaml.
+New-Item -ItemType Directory -Force .\wheels | Out-Null
+Copy-Item .\dist\arabic_sentiment_mlops-*.whl .\wheels\ -Force
+
+# Build a Bento from the configured service and print the generated Bento tag.
 uv run bentoml build
-```
 
-Use the exact Bento tag printed by `bentoml build` for containerization:
-
-```powershell
+# Containerize using the exact Bento tag returned by the preceding command.
 uv run bentoml containerize arabic-sentiment-service:<BENTO_TAG_FROM_BUILD>
 ```
 
-Then start the newly built image on host port 3001, using the image tag printed by containerization:
+Start a container only after checking that the name/port is not already in use:
 
 ```powershell
-docker run -d --name arabic-sentiment-bento -p 3001:3000 arabic-sentiment-service:<BENTO_TAG_FROM_BUILD>
+# Check existing containers first; do not blindly replace the current service.
+docker ps -a --filter "name=arabic-sentiment-bento"
+
+# Replace the placeholder with the exact local image tag printed by containerize.
+docker run -d --name arabic-sentiment-bento -p 3001:3000 arabic-sentiment-service:<IMAGE_TAG_FROM_CONTAINERIZE>
 ```
 
-Don't run this example blindly if `arabic-sentiment-bento` already exists. Check `docker ps -a` first and use a deliberate, documented swap/rollback sequence. Do not delete the previous image/container until the new instance has passed final validation.
+The placeholders in angle brackets are explanatory; replace them with actual tags before running the command. Do not remove the previous image/container until the replacement passes readiness and prediction checks.
 
-### 14.5 Start UI and observability
+### 14.5 Start the UI, proxy, Prometheus, and Grafana
 
 ```powershell
+# Build/start the UI and observability stack, separate from MLflow infrastructure.
 docker compose -f docker/docker-compose.observability.yml up -d --build
+
+# Review the services and published ports.
+docker compose -f docker/docker-compose.observability.yml ps
 ```
 
-Verify service state and then query the endpoints shown in Section 9.2. Keep the MLflow/PostgreSQL/RustFS stack separate from this Compose project.
-
-### 14.6 Evaluation and acceptance gate
-
-A smoke test is useful only for confirming request/prediction plumbing:
+### 14.6 Verify health and run one prediction
 
 ```powershell
-uv run python scripts/evaluate_served_model.py --limit 32 --batch-size 4
+# Check proxy health and upstream connectivity.
+Invoke-RestMethod http://127.0.0.1:8000/health
+
+# Check the BentoML service readiness endpoint.
+Invoke-RestMethod http://127.0.0.1:3001/readyz
+
+# Send a UTF-8 Arabic review to the proxy; expected response includes label and confidence.
+$payload = @{ texts = @('الخدمة ممتازة والتجربة رائعة') } | ConvertTo-Json -Depth 4
+$body = [System.Text.Encoding]::UTF8.GetBytes($payload)
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8000/predict `
+  -ContentType 'application/json; charset=utf-8' `
+  -Body $body
 ```
 
-The intended full test-set evaluation and gate are:
+Useful local interfaces are the Streamlit UI at `http://127.0.0.1:8501`, Prometheus at `http://127.0.0.1:9090`, Grafana at `http://127.0.0.1:3002`, and MLflow at `http://127.0.0.1:5000`.
+
+### 14.7 Run full served evaluation and the quality gate
 
 ```powershell
-uv run python scripts/evaluate_served_model.py --batch-size 8 --retries 5
+# Evaluate all held-out test rows through the actual proxy; retries are enabled for transient 502/503 responses.
+uv run python scripts/evaluate_served_model.py `
+  --api-url http://127.0.0.1:8000/predict `
+  --test-path data/processed/test.parquet `
+  --batch-size 8 `
+  --retries 10 `
+  --timeout 180
+
+# Apply the project's minimum macro-F1 and neutral-F1 thresholds to the saved complete evaluation.
 uv run python scripts/quality_gate.py reports/serving/api_evaluation.json
 ```
 
-The full evaluation currently has a documented failure state due to BentoML overload. Do not update the reference distribution or report success until the full evaluator finishes, records `complete_test_set: true` (or the equivalent complete flag used by the script), and the real quality gate passes.
+The current recorded full evaluation processed 8,874 rows and passed the quality gate. Re-run this only when the model, preprocessing, serving path, or evaluation artifact changes; do not repeat it without a reason. Verify `complete_test_set` in `reports/serving/api_evaluation.json` before treating a report as complete.
 
-### 14.7 Load testing — only after service stability
-
-A Locust script exists at `loadtest/locustfile.py`. A controlled starting run is:
+### 14.8 Re-run the exploratory batching benchmark or inspect Locust reports
 
 ```powershell
-New-Item -ItemType Directory -Force reports/locust | Out-Null
-uv run --with locust locust -f loadtest/locustfile.py `
-    --host http://127.0.0.1:8000 `
-    --users 10 --spawn-rate 2 --run-time 60s --headless `
-    --csv reports/locust/smoke
+# Run the small 10-request-per-size runtime benchmark (batch sizes 1, 4, and 8).
+uv run python scripts/benchmark_served_model.py --requests-per-size 10
+
+# List recorded load-test reports; inspect HTML/CSV instead of repeating a test unnecessarily.
+Get-ChildItem .\reports\locust -File
 ```
 
-Do not treat this command existing in the README as proof that a load test has run. Record actual p50/p95/p99, requests per second, failure rate, concurrent users, hardware, and resource use. Increase load only after error-free low-load results; the current full evaluation already demonstrated a saturation problem.
+The saved benchmark is exploratory, not the full handbook optimization protocol. Recorded load tests already show that ten concurrent users produced one failure in 196 requests, so do not use ten users as a qualified production target without new evidence.
+
+#### Optional Locust command (do not run as part of normal startup)
+
+A Locust workload is available for a deliberate re-test after a serving change. Existing reports already cover 2, 3, 4, 5, and 10 users, so do not repeat this just to reproduce the current README. If a change makes a new load test necessary, start conservatively and save a new report with a distinct prefix:
+
+```powershell
+# Optional, only after the service is healthy and a re-test is justified.
+uv run --with locust locust -f loadtest/locustfile.py `
+  --host http://127.0.0.1:8000 `
+  --users 5 --spawn-rate 1 --run-time 60s --headless `
+  --csv reports/locust/recheck-5users
+```
+
+### 14.9 Stop services safely
+
+```powershell
+# Stop UI/proxy/Prometheus/Grafana containers without deleting their named volumes.
+docker compose -f docker/docker-compose.observability.yml down
+
+# Stop MLflow/PostgreSQL/RustFS without deleting persistent volumes.
+docker compose --env-file .env -f docker/docker-compose.yml --project-directory . down
+
+# Stop the separately managed BentoML container if you want the model service offline.
+docker stop arabic-sentiment-bento
+```
+
+Avoid `docker compose down -v` unless you intentionally want to delete persisted database, artifact, prediction, or monitoring data. These commands do not stop unrelated Docker projects such as Nextcloud.
 
 ---
 
-## 15. Known gaps and prioritized next steps
+## 15. Future work and prioritized next steps
 
-The remaining tasks are listed in dependency order so they can be resolved once rather than revisiting already-working infrastructure unnecessarily.
+The current project is being finalized with honest boundaries: the full served evaluation and quality gate are complete, but the work below is deferred rather than represented as done.
 
-1. **Close the data lineage gaps.** Recover the exact source URL/license/paper for `alldata.csv`, cite it correctly, and reconcile the 88,738-row audit preview with the 88,737-row prepared splits. Keep the KAUST tweet dataset separate from the current app-review corpus unless new evidence proves otherwise.
-2. **Freeze model lineage.** Record the training checkpoint hash, offline report path, MLflow registry run/version, Bento model tag, `max_length`, preprocessing configuration, and image tag in one release record. Explain or reconcile the offline training `max_length=160` and serving metadata `max_length=256` difference.
-3. **Resolve sustained serving overload.** Use BentoML logs and measurements to determine whether batch dispatch, batching latency, request timeouts, or inference compute is the bottleneck. Change one control at a time and verify stability; do not rebuild Streamlit/Grafana/Prometheus/MLflow unless those components themselves change.
-4. **Complete one full HTTP evaluation.** Run all 8,874 test examples through the actual proxy/service path. Verify the complete-test flag, save final prediction and metric artifacts, run the quality gate, and only then set the reference distribution.
-5. **Run Locust and record evidence.** Produce real latency/RPS/error/resource measurements and document the saturation point and limiting resource. Demonstrate canary behavior if required by the course module.
-6. **Complete the Module 4 optimization evidence.** Implement and run the required benchmarking harness and the applicable optimization variants. Record accuracy trade-offs and hardware. Do not make TensorRT/ONNX/Triton/INT8 claims without artifacts.
-7. **Validate Module 5 acceptance.** Test the provisioned dashboard from a clean service start, test alerts and runbook actions, document whether external alert routing exists, and implement the missing drift/history requirements that apply to the rubric.
-8. **Finish GitHub release workflow.** Add the comprehensive README to root, ensure `ui/` and intended `model.py` changes are committed, exclude accidental files/secrets/data, inspect CI result, open and merge a PR into `main`, and tag only after merge. Keep `v0.2.0` unchanged.
-9. **Complete peer review.** Review another student's project as required by the handbook and submit the documented review deliverables to the instructor.
+1. **Improve the dataset audit and provenance record.** Record the exact upstream Git commit/file hashes and license; reconcile the 88,738-row audit preview with the 88,737-row prepared split total; verify why the local snapshot is imbalanced and differs in count from the paper's balanced 100K-per-language description. Preserve the current raw data and preprocessing policy so the audit remains reproducible.
+2. **Address class imbalance and neutral-class errors.** The prepared corpus contains 41,384 `NEGATIVE`, 25,269 `NEUTRAL`, and 22,084 `POSITIVE` examples. Analyze confusion patterns and confirm whether the active AraBERT training path uses class-weighted loss before changing it. Compare controlled alternatives such as weighted loss or train-only resampling against the same baseline. Keep validation/test distributions unchanged and report per-class precision/recall/F1; do not claim improvement until measured.
+3. **Improve model quality through controlled experiments.** Explore additional training, hyperparameter, preprocessing, calibration, and error-analysis experiments, especially for neutral-versus-negative ambiguity. Keep the current full-test served metrics as the baseline; any new candidate must be evaluated on the same held-out set and pass the quality gate before promotion.
+4. **Evaluate ONNX Runtime and other model optimizations.** Export the current model as a separate candidate and compare prediction/logit parity, accuracy/macro-F1/per-class F1, batch/request latency, throughput, peak memory, and artifact/image size against the current PyTorch model. TensorRT, quantization, pruning, distillation, or Triton should be considered only when the hardware/runtime path is available and the results can be measured fairly. No ONNX/TensorRT optimization is claimed as completed in this release.
+5. **Optimize and publish the Bento image, then test pull-only deployment.** The Bento image is about 7.8 GB and remains local; upload was deferred because of bandwidth impact. Profile dependencies/layers before removing anything, validate a smaller candidate, publish `m0hamedseleem/arabic-sentiment-bento:v1.0.0` (or a new immutable version tag), create a separate release Compose configuration using image references rather than local `build:` contexts, and validate a clean pull-only deployment. The three supporting images already pushed are the proxy, frontend, and MLflow `v1.0.0` images.
+6. **Qualify serving reliability and capacity.** Current evidence is a NO-GO for unrestricted production claims at ten concurrent users because one of 196 requests failed and the full-evaluation latency tail is high. Treat five concurrent users only as a provisional controlled-demo ceiling. If the service is changed, define explicit latency/error thresholds, collect resource measurements under the target load, and qualify the new candidate with a controlled canary.
+7. **Complete handbook optimization and monitoring acceptance.** The small batch benchmark is not a substitute for the full Module 4 protocol (warmup/repetition, fixed evaluation set, accuracy delta, p50/p95/p99, throughput, size, memory/utilization and multiple applicable optimization paths). For Module 5, validate drift history, alert/runbook behavior, external routing if required, and the remaining SLO/saturation evidence.
+8. **Finish GitHub release workflow.** Review the final diff and staged files, rerun Ruff/tests/compile/quality gate as appropriate, check the remote Actions run, push the active feature branch, open/review/merge a PR into `main`, and create a new tag only after merge. Keep secrets, raw data, local environments, caches, backup files, and unrelated files out of the commit.
+9. **Complete the separate peer-review deliverable.** Review another student's project and submit the required written feedback/document in the form requested by the course.
 
 ---
 
 ## 16. Final conclusion
 
-The project has progressed beyond a notebook model: it has a cleaned/prepared three-class Arabic corpus, a fine-tuned AraBERT checkpoint with a held-out offline report, a Python package with passing unit tests, DVC pipeline definitions, an MLflow registry model, a BentoML Docker image, a Streamlit UI, a proxy, Prometheus metrics, and a provisioned Grafana dashboard.
+The project has progressed beyond a notebook model: it has a cleaned/prepared three-class Arabic review corpus, a fine-tuned AraBERT model, package-based Python code, a DVC pipeline, an MLflow registry entry, a BentoML service, a Streamlit UI, an inference/telemetry proxy, Prometheus metrics, a provisioned Grafana dashboard, full served-model evaluation, a quality gate, load-test reports, and an initial runtime batching benchmark.
 
-The most useful measured offline result is **accuracy 0.8757 and macro-F1 0.8681**, with neutral F1 0.8290. The 32-row service smoke test scored lower and was too small to make a reliable final claim. The complete served-model evaluation still returns overload errors, so online model quality and the release quality gate remain open. Module 4 optimization measurements and portions of Module 5 acceptance are also not evidenced as complete.
+The offline held-out result is accuracy **0.8757** and macro-F1 **0.8681**. The full served evaluation over **8,874 examples** achieved accuracy **0.8781**, macro-F1 **0.8702**, negative F1 **0.9139**, neutral F1 **0.8311**, and positive F1 **0.8654**. The configured quality gate passed. The batching benchmark measured 30/30 successful requests and observed higher throughput with larger request batches, but it is exploratory rather than a complete optimization study.
 
-The engineering conclusion is therefore precise: **the local end-to-end stack starts and basic individual predictions work, but the project should not be described as a fully validated, load-tested, all-handbook-complete production release yet.** Finish the specific gaps above and keep the evidence tied to the exact model artifact and served version.
+The engineering conclusion is deliberately specific: **the full-set quality evaluation is complete and passed, while operational production qualification and the full optimization/deployment rubric are not complete.** High batch-latency tails, one failure in the recorded 10-user test, the unpublished 7.8 GB Bento image, missing pull-only Compose validation, data-version reconciliation, and future model/data optimization remain open. These limitations are documented so the README reports evidence rather than aspirations.
 
 ---
 
 ## References
 
-1. Antoun, W., Baly, F., and Hajj, H. (2020). [*AraBERT: Transformer-based Model for Arabic Language Understanding*](https://arxiv.org/abs/2003.00104). Model-family/methodology reference; not the source of the local dataset.
-2. [Official AraBERT implementation and preprocessing guidance](https://github.com/aub-mind/arabert).
-3. Alamro, H. et al. (2021). [*Overview of the Arabic Sentiment Analysis 2021 Competition at KAUST*](https://arxiv.org/abs/2109.14456). Reference for the alternative tweet benchmark discussed at selection time; **not** the source of the local review CSV.
-4. [KAUST Arabic Sentiment Analysis 2021 competition data page](https://www.kaggle.com/c/arabic-sentiment-analysis-2021-kaust/data). Candidate discussed only; its tweet data was not the corpus we processed through DVC.
-5. [Abed Khooli, *Arabic 100K Reviews* (Kaggle)](https://www.kaggle.com/datasets/abedkhooli/arabic-100k-reviews) and its [public Hugging Face mirror](https://huggingface.co/datasets/akhooli/ar_reviews_100k_3). Similar three-way Arabic review classification resources, but not verified as the exact upstream GitHub artifact: published descriptions report about 99,999 rows and numeric labels, while our `alldata.csv` contains 110,760 rows and string labels.
-6. AlGhamdi, F. et al. (2024). [*GLARE: Google Apps Arabic Reviews Dataset*](https://arxiv.org/abs/2412.15259). Related research on Arabic app reviews; it describes a much larger Google Play corpus and must not be cited as the source of the local labeled CSV without evidence.
-7. *The MLOps Practitioner — Mini Projects & Final Project Handbook*, ITI × MLOps MENA Community — course PDF supplied locally and used as the requirements checklist; no verified official public URL was available in the retained materials.
+1. Savci, P. and Das, B. (2023). [*Prediction of the customers' interests using sentiment analysis in e-commerce data for comparison of Arabic, English, and Turkish languages*](https://doi.org/10.1016/j.jksuci.2023.02.017). *Journal of King Saud University Computer and Information Sciences*, 35, 227–237. Relevant publication for the associated multilingual e-commerce review dataset and model comparison; local snapshot equivalence is not assumed.
+2. [BihterDass/ArabicTextClassificationDataset — GitHub dataset repository](https://github.com/BihterDass/ArabicTextClassificationDataset). The root contains `alldata.csv`, `train.csv`, `dev.csv`, and `test.csv`. Verify the license and record the exact file/commit hashes before redistribution.
+3. Antoun, W., Baly, F., and Hajj, H. (2020). [*AraBERT: Transformer-based Model for Arabic Language Understanding*](https://arxiv.org/abs/2003.00104). Model-family/methodology reference.
+4. [Official AraBERT implementation and preprocessing guidance](https://github.com/aub-mind/arabert).
+5. Alamro, H. et al. (2021). [*Overview of the Arabic Sentiment Analysis 2021 Competition at KAUST*](https://arxiv.org/abs/2109.14456) and [competition data page](https://www.kaggle.com/c/arabic-sentiment-analysis-2021-kaust/data). Alternative tweet benchmark discussed during selection; not the corpus used in the current DVC pipeline.
+6. *The MLOps Practitioner — Mini Projects & Final Project Handbook*, ITI × MLOps MENA Community — course material supplied locally and used as the requirements checklist; no official public URL is asserted.
 
-**Original GitHub dataset mirror:** URL/name still to be recovered. The project history confirms the downloaded file set (`alldata.csv`, `train.csv`, `dev.csv`, `test.csv`), but the exact origin repository could not be matched with enough certainty to cite. Keep this as an explicit provenance gap rather than making a false attribution.
+**Dataset comparison caveat:** the associated paper describes about 100K balanced samples per language and reports 95.1% Arabic accuracy for multilingual BERT. This project's local snapshot has 110,760 raw rows with an imbalanced distribution, and this project uses AraBERT v0.2 with its own split and evaluation protocol. The paper's accuracy is therefore contextual research, not a directly comparable baseline. This project claims only its own measured offline and served metrics.
+
+---
+
+## Appendix A — Quick-start commands (Windows PowerShell)
+
+This quick start is for the **existing local project setup**. Run commands from the repository root. Before starting, make sure `.env` exists and contains the required local credentials. The BentoML image is currently local-only; a new machine cannot run the complete application by pulling Docker Hub images alone until the Bento image is published or built locally with the required model artifacts.
+
+```powershell
+# 1. Confirm the repository location and check that required local configuration exists.
+Get-Location
+Test-Path .\.env
+
+# 2. Start MLflow, PostgreSQL, and RustFS using the existing infrastructure Compose file.
+#    This does not stop or modify unrelated Docker projects such as Nextcloud.
+docker compose --env-file .env -f docker/docker-compose.yml --project-directory . up -d --build
+
+# 3. Safely check/start the separately managed BentoML container.
+#    If it exists and is stopped, start it. If it is already running, leave it alone.
+$containerName = 'arabic-sentiment-bento'
+$existingContainer = docker ps -a --filter "name=^/$containerName$" --format "{{.Names}}"
+$runningContainer = docker ps --filter "name=^/$containerName$" --format "{{.Names}}"
+if ($runningContainer -contains $containerName) {
+    Write-Host "BentoML container is already running; leaving it unchanged."
+} elseif ($existingContainer -contains $containerName) {
+    docker start $containerName
+} else {
+    # This is a local-only image and must exist on this machine before this branch can work.
+    $localBentoImage = 'arabic-sentiment-service:vetbwwgkosur4aav'
+    docker image inspect $localBentoImage *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Local Bento image '$localBentoImage' is missing. Build/containerize BentoML first using Section 14.4."
+    }
+    docker run -d --name $containerName -p 3001:3000 $localBentoImage
+}
+
+# 4. Build/start the UI, inference proxy, Prometheus, and Grafana from their Compose file.
+docker compose -f docker/docker-compose.observability.yml up -d --build
+
+# 5. Check service status and the inference path.
+docker compose --env-file .env -f docker/docker-compose.yml --project-directory . ps
+
+docker compose -f docker/docker-compose.observability.yml ps
+Invoke-RestMethod http://127.0.0.1:3001/readyz
+Invoke-RestMethod http://127.0.0.1:8000/health
+
+# 6. Send one UTF-8 Arabic review and inspect the predicted label/confidence.
+$payload = @{ texts = @('الخدمة ممتازة والتجربة رائعة') } | ConvertTo-Json -Depth 4
+$body = [System.Text.Encoding]::UTF8.GetBytes($payload)
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8000/predict `
+  -ContentType 'application/json; charset=utf-8' `
+  -Body $body
+```
+
+Open the local interfaces in a browser:
+
+- Streamlit UI: `http://127.0.0.1:8501`
+- Inference proxy: `http://127.0.0.1:8000`
+- Prometheus: `http://127.0.0.1:9090`
+- Grafana: `http://127.0.0.1:3002`
+- MLflow: `http://127.0.0.1:5000`
+
+When finished, stop only this project's services. Do **not** add `-v`, because that would delete persistent volumes:
+
+```powershell
+# Stop the UI/proxy/Prometheus/Grafana stack.
+docker compose -f docker/docker-compose.observability.yml down
+
+# Stop MLflow/PostgreSQL/RustFS while preserving their named volumes.
+docker compose --env-file .env -f docker/docker-compose.yml --project-directory . down
+
+# Stop BentoML only if you want its separately managed model service offline.
+docker stop arabic-sentiment-bento
+```
+
+For a clean machine, first follow Section 14 to prepare the Python environment and obtain the required data/model artifacts. The full pull-only Docker deployment is still future work because the approximately 7.8 GB Bento image has not been pushed to Docker Hub.
