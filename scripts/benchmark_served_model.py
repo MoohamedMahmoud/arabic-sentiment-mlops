@@ -6,6 +6,7 @@ modify the API evaluation report, monitoring baseline, model, or running service
 Example (from repository root):
     uv run python scripts/benchmark_served_model.py
 """
+
 from __future__ import annotations
 
 import argparse
@@ -40,7 +41,9 @@ def percentile(values: list[float], quantile: float) -> float | None:
     return ordered[lower] * (upper - position) + ordered[upper] * (position - lower)
 
 
-def request_predictions(url: str, texts: list[str], timeout: float) -> tuple[int, list[dict[str, Any]] | None, str | None]:
+def request_predictions(
+    url: str, texts: list[str], timeout: float
+) -> tuple[int, list[dict[str, Any]] | None, str | None]:
     payload = json.dumps({"texts": texts}, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(
         url,
@@ -64,8 +67,16 @@ def request_predictions(url: str, texts: list[str], timeout: float) -> tuple[int
     else:
         predictions = body
     if not isinstance(predictions, list) or len(predictions) != len(texts):
-        return status, None, f"Unexpected response or prediction count; expected {len(texts)}"
-    if any(not isinstance(item, dict) or item.get("label") not in {"NEGATIVE", "NEUTRAL", "POSITIVE"} for item in predictions):
+        return (
+            status,
+            None,
+            f"Unexpected response or prediction count; expected {len(texts)}",
+        )
+    if any(
+        not isinstance(item, dict)
+        or item.get("label") not in {"NEGATIVE", "NEUTRAL", "POSITIVE"}
+        for item in predictions
+    ):
         return status, None, "Response contains an invalid prediction label"
     return status, predictions, None
 
@@ -75,21 +86,41 @@ def main() -> int:
     parser.add_argument("--api-url", default=DEFAULT_API_URL)
     parser.add_argument("--test-path", type=Path, default=DEFAULT_TEST_PATH)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--batch-sizes", default="1,4,8", help="Comma-separated request payload sizes, maximum 8")
-    parser.add_argument("--requests-per-size", type=int, default=10, help="Measured requests per batch size; 10 is exploratory, increase for stronger estimates")
-    parser.add_argument("--pool-size", type=int, default=32, help="Number of fixed test texts sampled from for each configuration")
+    parser.add_argument(
+        "--batch-sizes",
+        default="1,4,8",
+        help="Comma-separated request payload sizes, maximum 8",
+    )
+    parser.add_argument(
+        "--requests-per-size",
+        type=int,
+        default=10,
+        help="Measured requests per batch size; 10 is exploratory, increase for stronger estimates",
+    )
+    parser.add_argument(
+        "--pool-size",
+        type=int,
+        default=32,
+        help="Number of fixed test texts sampled from for each configuration",
+    )
     parser.add_argument("--timeout", type=float, default=180.0)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     try:
-        batch_sizes = sorted({int(value.strip()) for value in args.batch_sizes.split(",")})
+        batch_sizes = sorted(
+            {int(value.strip()) for value in args.batch_sizes.split(",")}
+        )
     except ValueError as exc:
-        raise SystemExit("--batch-sizes must be comma-separated integers, e.g. 1,4,8") from exc
+        raise SystemExit(
+            "--batch-sizes must be comma-separated integers, e.g. 1,4,8"
+        ) from exc
     if not batch_sizes or any(size < 1 or size > 8 for size in batch_sizes):
         raise SystemExit("Batch sizes must be integers between 1 and 8")
     if args.requests_per_size < 1 or args.pool_size < max(batch_sizes):
-        raise SystemExit("--requests-per-size must be >= 1 and --pool-size must be >= the largest batch size")
+        raise SystemExit(
+            "--requests-per-size must be >= 1 and --pool-size must be >= the largest batch size"
+        )
     if not args.test_path.is_file():
         raise SystemExit(f"Test file not found: {args.test_path}")
 
@@ -99,20 +130,28 @@ def main() -> int:
     texts = frame["text"].dropna().astype(str)
     texts = texts[texts.str.strip().ne("")].head(args.pool_size).tolist()
     if len(texts) < max(batch_sizes):
-        raise SystemExit(f"Need at least {max(batch_sizes)} valid texts, found {len(texts)}")
+        raise SystemExit(
+            f"Need at least {max(batch_sizes)} valid texts, found {len(texts)}"
+        )
 
     # Untimed warm-up checks reachability and response shape before measurement.
-    status, _predictions, error = request_predictions(args.api_url, [texts[0]], args.timeout)
+    status, _predictions, error = request_predictions(
+        args.api_url, [texts[0]], args.timeout
+    )
     if error:
         raise SystemExit(f"API preflight failed (status {status}): {error}")
 
     results: list[dict[str, Any]] = []
     print(f"API: {args.api_url}")
-    print(f"Test text pool: {len(texts)}; measured requests per size: {args.requests_per_size}")
+    print(
+        f"Test text pool: {len(texts)}; measured requests per size: {args.requests_per_size}"
+    )
     print("No retries are used, so HTTP failures remain visible in the report.\n")
 
     for batch_size in batch_sizes:
-        rng = random.Random(args.seed)  # same deterministic sampling strategy for each size
+        rng = random.Random(
+            args.seed
+        )  # same deterministic sampling strategy for each size
         latencies: list[float] = []
         successful_requests = 0
         failed_requests = 0
@@ -124,12 +163,16 @@ def main() -> int:
             # Cycle through a fixed pool, avoiding confounding each configuration
             # with a different split of the test set.
             start = (request_index * batch_size) % len(texts)
-            batch = [texts[(start + offset) % len(texts)] for offset in range(batch_size)]
+            batch = [
+                texts[(start + offset) % len(texts)] for offset in range(batch_size)
+            ]
             # Stable per-request variation while keeping all settings reproducible.
             if len(batch) > 1:
                 rng.shuffle(batch)
             request_started = time.perf_counter()
-            status, predictions, error = request_predictions(args.api_url, batch, args.timeout)
+            status, predictions, error = request_predictions(
+                args.api_url, batch, args.timeout
+            )
             elapsed = time.perf_counter() - request_started
             latencies.append(elapsed)
             if error is None and predictions is not None:
@@ -138,7 +181,9 @@ def main() -> int:
             else:
                 failed_requests += 1
                 if len(errors) < 5:
-                    errors.append(error or f"Unexpected failure with HTTP status {status}")
+                    errors.append(
+                        error or f"Unexpected failure with HTTP status {status}"
+                    )
             print(
                 f"batch_size={batch_size} request={request_index + 1}/{args.requests_per_size} "
                 f"status={'OK' if error is None else 'FAIL'} latency={elapsed:.3f}s"
@@ -152,7 +197,9 @@ def main() -> int:
             "requests_failed": failed_requests,
             "texts_succeeded": successful_texts,
             "wall_time_seconds": round(wall_seconds, 6),
-            "successful_texts_per_second": round(successful_texts / wall_seconds, 6) if wall_seconds > 0 else 0.0,
+            "successful_texts_per_second": round(successful_texts / wall_seconds, 6)
+            if wall_seconds > 0
+            else 0.0,
             "request_latency_seconds": {
                 "p50": percentile(latencies, 0.50),
                 "p95": percentile(latencies, 0.95),
@@ -189,7 +236,9 @@ def main() -> int:
         "results": results,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     print(f"Saved benchmark report: {args.output}")
     return 0 if all(item["requests_failed"] == 0 for item in results) else 2
 
