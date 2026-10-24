@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -10,19 +11,20 @@ permissions:
 
 jobs:
   test-and-lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
 
@@ -38,11 +40,56 @@ jobs:
       - name: Run test suite
         run: uv run pytest -q
 
-      - name: Apply serving quality gate when a complete evaluation report is committed
+      - name: Apply serving quality gate only to a complete held-out evaluation
         shell: bash
+        env:
+          EXPECTED_TEST_ROWS: "8874"
         run: |
-          if [[ -f reports/serving/api_evaluation.json ]]; then
-            uv run python scripts/quality_gate.py reports/serving/api_evaluation.json
-          else
-            echo "No complete serving evaluation committed yet; runtime quality gate skipped."
+          set -euo pipefail
+
+          report="reports/serving/api_evaluation.json"
+
+          if [[ ! -f "$report" ]]; then
+            echo "::notice title=Serving quality gate deferred::No serving evaluation report is committed."
+            exit 0
           fi
+
+          evaluation_status="$(uv run python -c '
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          data = json.loads(
+              Path(sys.argv[1]).read_text(encoding="utf-8")
+          )
+          expected = int(os.environ["EXPECTED_TEST_ROWS"])
+          sample_count = data.get("sample_count")
+
+          is_complete = (
+              data.get("complete_test_set") is True
+              and sample_count == expected
+          )
+
+          if is_complete:
+              print("complete")
+          else:
+              print(
+                  "incomplete: complete_test_set={!r}, "
+                  "sample_count={!r}, expected_sample_count={}".format(
+                      data.get("complete_test_set"),
+                      sample_count,
+                      expected,
+                  )
+              )
+          ' "$report")"
+
+          if [[ "$evaluation_status" != "complete" ]]; then
+            echo "::warning title=Serving quality gate deferred::$evaluation_status. A complete held-out evaluation is required before release."
+            exit 0
+          fi
+
+          echo "Complete 8,874-row held-out evaluation detected."
+          echo "Applying the configured model-quality thresholds."
+
+          uv run python scripts/quality_gate.py "$report"

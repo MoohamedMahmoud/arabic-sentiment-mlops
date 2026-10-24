@@ -44,6 +44,9 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.16.10",
 ]
+loadtest = [
+    "locust>=2.46.7",
+]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu132" }
